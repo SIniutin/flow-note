@@ -49,6 +49,7 @@ services:
       context: ./collab-service
       dockerfile: Dockerfile
     restart: unless-stopped
+<<<<<<< HEAD
     # Порт 4000 не пробрасывается на хост — доступ только через api-gateway (/collab/).
     # Для отладки раскомментируй:
     # ports:
@@ -56,6 +57,11 @@ services:
     expose:
       - "4000"
       - "4001"
+=======
+    ports:
+      - "4000:4000"
+      - "4001:4001"   # routing HTTP server (GET /page-instance/:id, GET /health)
+>>>>>>> 5b04681 (feat v1 collab service)
     environment:
       PORT: "4000"
       ROUTING_PORT: "4001"
@@ -65,11 +71,14 @@ services:
       MWS_API_BASE: "http://mock-tables:8080/fusion/v1"
       GRPC_FLUSH_MAX_ATTEMPTS: "5"
       NODE_ENV: "production"
+<<<<<<< HEAD
       JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
       JWT_ISSUER: "flow-note-auth"
       JWT_AUDIENCE: "flow-note-api"
     secrets:
       - jwt_public_key
+=======
+>>>>>>> 5b04681 (feat v1 collab service)
     depends_on:
       redis:
         condition: service_healthy
@@ -92,6 +101,7 @@ services:
       retries: 3
       start_period: 20s
 
+<<<<<<< HEAD
   # ── PostgreSQL (auth-service) ────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
@@ -171,6 +181,22 @@ secrets:
 volumes:
   mock-pages-snapshots:   # снапшоты Y.Doc переживают docker compose restart
   postgres-data:
+=======
+  # ── API Gateway (nginx) ──────────────────────────────────────────────────────
+  api-gateway:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      collab-service:
+        condition: service_healthy
+
+volumes:
+  mock-pages-snapshots:   # снапшоты Y.Doc переживают docker compose restart
+>>>>>>> 5b04681 (feat v1 collab service)
 
 networks:
   default:
