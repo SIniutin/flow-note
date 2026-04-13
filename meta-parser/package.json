@@ -1,20 +1,16 @@
 {
-  "name": "collab-service",
+  "name": "meta-parser",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
-    "mock:pages": "node mock-pages/server.js",
-    "mock:tables": "node mock-tables/server.js"
+    "dev": "ts-node src/index.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",
     "@grpc/grpc-js": "^1.10.0",
     "@grpc/proto-loader": "^0.7.0",
-    "@hocuspocus/server": "^2.13.0",
-    "ioredis": "^5.3.2",
     "kafkajs": "^2.2.4",
     "yjs": "^13.6.14"
   },

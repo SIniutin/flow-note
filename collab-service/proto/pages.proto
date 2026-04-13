@@ -3,28 +3,19 @@ syntax = "proto3";
 package pages;
 
 service PagesService {
-  // Collab → Pages: сохранить Y.Doc snapshot.
-  // Вызывается по таймеру (каждые 3 мин) и при idle destroy.
-  rpc SaveSnapshot(SaveSnapshotRequest) returns (SaveSnapshotResponse);
-
-  // Pages → Collab: получить последний snapshot страницы при старте.
-  // Если snapshot не найден — возвращает gRPC статус NOT_FOUND.
-  rpc GetSnapshot(GetSnapshotRequest) returns (stream GetSnapshotChunk);
+  // Meta-parser → Pages: передать распарсенные метаданные страницы.
+  // Вызывается meta-parser после скачивания snapshot из S3 и парсинга Y.Doc.
+  rpc UpdatePageMeta(PageMetadataRequest) returns (UpdatePageMetaResponse);
 }
 
-message SaveSnapshotRequest {
-  string page_id = 1;
-  bytes  data    = 2; // Y.encodeStateAsUpdate(doc)
+message PageMetadataRequest {
+  string page_id      = 1;
+  string s3_key       = 2; // S3-ключ snapshot, из которого извлечены данные
+  string title        = 3; // первый heading или первый paragraph (plain text)
+  string content_text = 4; // весь plain text документа (для полнотекстового поиска)
+  int32  word_count   = 5;
+  repeated string mws_table_ids = 6; // dst_id всех mws_table-блоков
+  int64  snapshot_ts  = 7; // unix timestamp ms события из Kafka
 }
 
-message SaveSnapshotResponse {}
-
-message GetSnapshotRequest {
-  string page_id = 1;
-}
-
-// Один чанк потокового ответа GetSnapshot.
-// Если snapshot не найден — сервер возвращает статус NOT_FOUND (stream не открывается).
-message GetSnapshotChunk {
-  bytes data = 1; // фрагмент Y.encodeStateAsUpdate(doc)
-}
+message UpdatePageMetaResponse {}

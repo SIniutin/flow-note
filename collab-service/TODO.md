@@ -2,6 +2,11 @@
 
 ## Высокий приоритет
 
+- [ ] **Включить валидацию токена от оргов хакатона**
+  Сейчас `onAuthenticate` принимает любой непустой токен (auth отключён для тестирования).
+  Когда получишь токен: вставить в `AUTH_TOKEN` env в docker-compose.yml и раскомментировать
+  проверку `token !== config.authToken` в `src/index.ts:onAuthenticate`.
+
 - [ ] **Auth middleware в api-gateway**
   Валидация JWT/токена до проброса WS на collab-service.
   Сейчас onAuthenticate проверяет только наличие токена, но не его подпись.
