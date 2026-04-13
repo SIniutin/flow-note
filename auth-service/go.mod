@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/google/uuid v1.6.0
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/tasker-iniutin/common v1.0.1
 	google.golang.org/grpc v1.79.1
