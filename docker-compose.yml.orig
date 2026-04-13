@@ -1,0 +1,203 @@
+services:
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Mock Pages gRPC service ──────────────────────────────────────────────────
+  # Заменить на реальный образ pages-service в prod:
+  #   image: your-registry/pages-service:latest
+  mock-pages:
+    image: node:20-alpine
+    working_dir: /app
+    command: node mock-pages/server.js
+    volumes:
+      - ./collab-service:/app          # bind-mount исходников (нужны node_modules)
+      - mock-pages-snapshots:/app/mock-pages/snapshots  # snapshots переживают перезапуск
+    # порт не пробрасывается на хост — collab-service обращается по имени сети mock-pages:50051
+    expose:
+      - "50051"
+    environment:
+      MOCK_PAGES_PORT: "50051"
+    restart: unless-stopped
+
+  # ── Mock Tables HTTP service ──────────────────────────────────────────────────
+  # Заменить на реальный MWS API в prod через MWS_API_BASE в collab-service.
+  mock-tables:
+    image: node:20-alpine
+    working_dir: /app
+    command: node mock-tables/server.js
+    volumes:
+      - ./collab-service:/app
+    ports:
+      - "8080:8080"
+    environment:
+      MOCK_TABLES_PORT: "8080"
+    restart: unless-stopped
+
+  # ── Collab Service ───────────────────────────────────────────────────────────
+  collab-service:
+    build:
+      context: ./collab-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+<<<<<<< HEAD
+    # Порт 4000 не пробрасывается на хост — доступ только через api-gateway (/collab/).
+    # Для отладки раскомментируй:
+    # ports:
+    #   - "4000:4000"
+    expose:
+      - "4000"
+      - "4001"
+=======
+    ports:
+      - "4000:4000"
+      - "4001:4001"   # routing HTTP server (GET /page-instance/:id, GET /health)
+>>>>>>> 5b04681 (feat v1 collab service)
+    environment:
+      PORT: "4000"
+      ROUTING_PORT: "4001"
+      REDIS_URL: "redis://redis:6379"
+      INSTANCE_ADDR: "collab-service:4000"
+      PAGES_GRPC_ADDR: "mock-pages:50051"
+      MWS_API_BASE: "http://mock-tables:8080/fusion/v1"
+      GRPC_FLUSH_MAX_ATTEMPTS: "5"
+      NODE_ENV: "production"
+<<<<<<< HEAD
+      JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
+      JWT_ISSUER: "flow-note-auth"
+      JWT_AUDIENCE: "flow-note-api"
+    secrets:
+      - jwt_public_key
+=======
+>>>>>>> 5b04681 (feat v1 collab service)
+    depends_on:
+      redis:
+        condition: service_healthy
+      mock-pages:
+        condition: service_started
+      mock-tables:
+        condition: service_started
+    healthcheck:
+      # Опрашиваем routing HTTP-сервер (порт 4001) — он стартует вместе с hocuspocus.
+      test:
+        - "CMD-SHELL"
+        - |
+          node -e "
+            require('http').get('http://localhost:4001/health', function(r){
+              process.exit(r.statusCode === 200 ? 0 : 1);
+            }).on('error', function(){ process.exit(1); });
+          "
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+<<<<<<< HEAD
+  # ── PostgreSQL (auth-service) ────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: auth
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Auth Service ─────────────────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "50052"
+    environment:
+      AUTH_GRPC_ADDR: ":50052"
+      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/auth?sslmode=disable"
+      REDIS_ADDR: "redis:6379"
+      JWT_PRIVATE_KEY_PEM: "/run/secrets/jwt_private_key"
+      JWT_ISSUER: "flow-note-auth"
+      JWT_AUDIENCE: "flow-note-api"
+      JWT_ACCESS_TTL: "15m"
+      JWT_KEY_ID: "k1"
+      ENABLE_GRPC_REFLECTION: "true"
+    secrets:
+      - jwt_private_key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── API Gateway (Go) ─────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+    environment:
+      GATEWAY_ADDR: ":8080"
+      AUTH_GRPC_ADDR: "auth-service:50052"
+      TASK_GRPC_ADDR: "task-service:50051"
+      NOTIFY_GRPC_ADDR: "notify-service:50053"
+      COLLAB_ADDR: "collab-service:4000"
+      JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
+      JWT_ISSUER: "flow-note-auth"
+      JWT_AUDIENCE: "flow-note-api"
+      ALLOWED_ORIGIN: "http://localhost:5173"
+    secrets:
+      - jwt_public_key
+    depends_on:
+      auth-service:
+        condition: service_started
+      collab-service:
+        condition: service_healthy
+
+secrets:
+  jwt_private_key:
+    file: ./secrets/jwt_private_key.pem
+  jwt_public_key:
+    file: ./secrets/jwt_public_key.pem
+
+volumes:
+  mock-pages-snapshots:   # снапшоты Y.Doc переживают docker compose restart
+  postgres-data:
+=======
+  # ── API Gateway (nginx) ──────────────────────────────────────────────────────
+  api-gateway:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./api-gateway/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      collab-service:
+        condition: service_healthy
+
+volumes:
+  mock-pages-snapshots:   # снапшоты Y.Doc переживают docker compose restart
+>>>>>>> 5b04681 (feat v1 collab service)
+
+networks:
+  default:
+    name: mws-net
