@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "comment.thread.followed",
+  "type": "object",
+  "required": ["event_id", "event_type", "occurred_at", "actor_user_id", "page_id", "thread_id"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"const": "comment.thread.followed"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "actor_user_id": {"type": "string", "format": "uuid"},
+    "page_id": {"type": "string", "format": "uuid"},
+    "thread_id": {"type": "string", "format": "uuid"},
+    "dedupe_key": {"type": "string"}
+  }
+}

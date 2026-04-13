@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "page.mention.created",
+  "type": "object",
+  "required": ["event_id", "event_type", "occurred_at", "actor_user_id", "page_id", "mentioned_user_id"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "event_type": {"const": "page.mention.created"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "actor_user_id": {"type": "string", "format": "uuid"},
+    "page_id": {"type": "string", "format": "uuid"},
+    "mentioned_user_id": {"type": "string", "format": "uuid"},
+    "preview": {"type": "string"},
+    "dedupe_key": {"type": "string"}
+  }
+}

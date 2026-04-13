@@ -1,0 +1,392 @@
+openapi: 3.0.3
+info:
+  title: Comment Service API
+  version: 1.0.0
+  description: |
+    REST facade for `comment.v1.CommentService`.
+    These endpoints are defined in `proto/comment/v1/comment.proto` via `google.api.http`
+    and are expected to be transcoded to gRPC by gateway or edge proxy.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Threads
+  - name: Comments
+components:
+  securitySchemes:
+    UserIDHeader:
+      type: apiKey
+      in: header
+      name: x-user-id
+  schemas:
+    Anchor:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [text_range, table_cell]
+        block_id:
+          type: string
+        start_offset:
+          type: integer
+        end_offset:
+          type: integer
+        selected_text:
+          type: string
+        context_before:
+          type: string
+        context_after:
+          type: string
+        snapshot_id:
+          type: string
+        table_id:
+          type: string
+        row_id:
+          type: string
+        column_id:
+          type: string
+    BodyNode:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [text, mention]
+        text:
+          type: string
+        user_id:
+          type: string
+          format: uuid
+        label:
+          type: string
+    Thread:
+      type: object
+      required: [id, page_id, anchor, created_by, status, created_at, updated_at, comments_count]
+      properties:
+        id:
+          type: string
+          format: uuid
+        page_id:
+          type: string
+          format: uuid
+        anchor:
+          $ref: '#/components/schemas/Anchor'
+        anchor_hash:
+          type: string
+        created_by:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, resolved, deleted]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        resolved_by:
+          type: string
+          format: uuid
+          nullable: true
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_commented_at:
+          type: string
+          format: date-time
+          nullable: true
+        comments_count:
+          type: integer
+    Comment:
+      type: object
+      required: [id, thread_id, author_id, body, body_text, created_at, updated_at, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        thread_id:
+          type: string
+          format: uuid
+        parent_comment_id:
+          type: string
+          format: uuid
+          nullable: true
+        author_id:
+          type: string
+          format: uuid
+        body:
+          type: array
+          items:
+            $ref: '#/components/schemas/BodyNode'
+        body_text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        edited_at:
+          type: string
+          format: date-time
+          nullable: true
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          type: string
+          enum: [active, deleted]
+    ThreadWithComments:
+      type: object
+      required: [thread, comments]
+      properties:
+        thread:
+          $ref: '#/components/schemas/Thread'
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+    CreateThreadRequest:
+      type: object
+      required: [anchor, body]
+      properties:
+        anchor:
+          $ref: '#/components/schemas/Anchor'
+        body:
+          type: array
+          items:
+            $ref: '#/components/schemas/BodyNode'
+    CreateThreadResponse:
+      type: object
+      required: [thread, root_comment]
+      properties:
+        thread:
+          $ref: '#/components/schemas/Thread'
+        root_comment:
+          $ref: '#/components/schemas/Comment'
+    AddReplyRequest:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: array
+          items:
+            $ref: '#/components/schemas/BodyNode'
+    AddReplyResponse:
+      type: object
+      required: [comment]
+      properties:
+        comment:
+          $ref: '#/components/schemas/Comment'
+    ListThreadsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Thread'
+    GetThreadResponse:
+      type: object
+      required: [item]
+      properties:
+        item:
+          $ref: '#/components/schemas/ThreadWithComments'
+security:
+  - UserIDHeader: []
+paths:
+  /api/v1/pages/{page_id}/threads:
+    post:
+      tags: [Threads]
+      summary: Create thread with root comment
+      parameters:
+        - in: path
+          name: page_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateThreadRequest'
+      responses:
+        '200':
+          description: Thread created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateThreadResponse'
+    get:
+      tags: [Threads]
+      summary: List page threads
+      parameters:
+        - in: path
+          name: page_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: active_only
+          schema:
+            type: boolean
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Threads list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListThreadsResponse'
+  /api/v1/pages/{page_id}/discussions:
+    get:
+      tags: [Threads]
+      summary: List active discussions for sidebar
+      parameters:
+        - in: path
+          name: page_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Discussions list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListThreadsResponse'
+  /api/v1/threads/{thread_id}:
+    get:
+      tags: [Threads]
+      summary: Get thread with root comment and replies
+      parameters:
+        - in: path
+          name: thread_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Thread details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetThreadResponse'
+  /api/v1/threads/{thread_id}/comments:
+    post:
+      tags: [Comments]
+      summary: Add reply to thread root comment
+      description: Reply-to-reply is not supported. Every reply is attached to the root comment of the thread.
+      parameters:
+        - in: path
+          name: thread_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddReplyRequest'
+      responses:
+        '200':
+          description: Reply created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddReplyResponse'
+  /api/v1/threads/{thread_id}/resolve:
+    post:
+      tags: [Threads]
+      summary: Resolve thread
+      parameters:
+        - in: path
+          name: thread_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Thread resolved
+  /api/v1/threads/{thread_id}/reopen:
+    post:
+      tags: [Threads]
+      summary: Reopen thread
+      parameters:
+        - in: path
+          name: thread_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Thread reopened
+  /api/v1/comments/{comment_id}:
+    delete:
+      tags: [Comments]
+      summary: Soft delete comment
+      parameters:
+        - in: path
+          name: comment_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Comment soft deleted
+  /api/v1/threads/{thread_id}/follow:
+    post:
+      tags: [Threads]
+      summary: Follow thread
+      parameters:
+        - in: path
+          name: thread_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Thread followed
+  /api/v1/threads/{thread_id}/unfollow:
+    post:
+      tags: [Threads]
+      summary: Unfollow thread
+      parameters:
+        - in: path
+          name: thread_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Thread unfollowed
