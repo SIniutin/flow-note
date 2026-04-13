@@ -1,0 +1,7 @@
+.ui-comment-mark{
+    background:var(--accent-soft);
+    border-bottom:2px solid var(--accent);
+    cursor:pointer;
+    border-radius:2px;
+    padding:0 1px;
+}

@@ -24,10 +24,12 @@ export const config = {
   redisUrl:      str("REDIS_URL",       "redis://localhost:6379"),
   instanceAddr:  str("INSTANCE_ADDR",   "collab-service:4000"),
 
-  // ── gRPC / pages-service ──────────────────────────────────────────────────
-  pagesGrpcAddr:      str("PAGES_GRPC_ADDR",          "localhost:50051"),
-  snapshotTimeoutMs:  int("SNAPSHOT_TIMEOUT_MS",       8_000),
-  grpcFlushAttempts:  int("GRPC_FLUSH_MAX_ATTEMPTS",   5),
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  /** В проде — токен от оргов хакатона через AUTH_TOKEN env. */
+  authToken: str("AUTH_TOKEN", "dev-token"),
+
+  // ── S3 flush retry ────────────────────────────────────────────────────────
+  grpcFlushAttempts:    int("GRPC_FLUSH_MAX_ATTEMPTS", 5),
   grpcFlushBaseDelayMs: 1_000,
 
   // ── MWS Tables API ────────────────────────────────────────────────────────
@@ -56,4 +58,15 @@ export const config = {
   jwtPublicKeyPem:  str("JWT_PUBLIC_KEY_PEM", ""),
   jwtIssuer:        str("JWT_ISSUER",         "flow-note-auth"),
   jwtAudience:      str("JWT_AUDIENCE",       "flow-note-api"),
+  // ── Object Storage (MinIO / S3) ───────────────────────────────────────────
+  s3Endpoint:    str("S3_ENDPOINT",    "http://minio:9000"),
+  s3Bucket:      str("S3_BUCKET",      "snapshots"),
+  s3AccessKey:   str("S3_ACCESS_KEY",  "minioadmin"),
+  s3SecretKey:   str("S3_SECRET_KEY",  "minioadmin"),
+  s3Region:      str("S3_REGION",      "us-east-1"),  // MinIO не проверяет, но SDK требует
+
+  // ── Kafka ─────────────────────────────────────────────────────────────────
+  kafkaBrokers:   str("KAFKA_BROKERS",   "kafka:9092"),
+  kafkaClientId:  str("KAFKA_CLIENT_ID", "collab-service"),
+  kafkaTopic:     str("KAFKA_TOPIC",     "page.snapshot.uploaded"),
 } as const;

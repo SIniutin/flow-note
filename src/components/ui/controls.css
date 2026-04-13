@@ -1,0 +1,153 @@
+/* Button */
+.ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    font-family: var(--font-sans);
+    font-weight: var(--fw-medium);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    white-space: nowrap;
+    user-select: none
+}
+
+.ui-btn--sm {
+    height: 28px;
+    padding: 0 var(--space-3);
+    font-size: var(--fs-sm)
+}
+
+.ui-btn--md {
+    height: 36px;
+    padding: 0 var(--space-4);
+    font-size: var(--fs-md)
+}
+
+.ui-btn--full {
+    width: 100%
+}
+
+.ui-btn:disabled {
+    opacity: .5;
+    cursor: not-allowed
+}
+
+.ui-btn--primary {
+    background: var(--accent);
+    color: var(--text-on-accent)
+}
+
+.ui-btn--primary:hover:not(:disabled) {
+    background: var(--accent-hover)
+}
+
+.ui-btn--secondary {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border-color: var(--border-default)
+}
+
+.ui-btn--secondary:hover:not(:disabled) {
+    background: var(--bg-surface-muted)
+}
+
+.ui-btn--danger {
+    background: var(--danger);
+    color: #fff
+}
+
+.ui-btn--danger:hover:not(:disabled) {
+    background: var(--danger-hover)
+}
+
+.ui-btn--ghost {
+    background: transparent;
+    color: var(--text-primary)
+}
+
+.ui-btn--ghost:hover:not(:disabled) {
+    background: var(--bg-surface-muted)
+}
+
+.ui-btn__spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: ui-spin .8s linear infinite
+}
+
+@keyframes ui-spin {
+    to {
+        transform: rotate(360deg)
+    }
+}
+
+/* IconButton */
+.ui-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)
+}
+
+.ui-iconbtn--sm {
+    width: 24px;
+    height: 24px
+}
+
+.ui-iconbtn--md {
+    width: 30px;
+    height: 30px
+}
+
+.ui-iconbtn:hover {
+    background: var(--bg-surface-muted)
+}
+
+.ui-iconbtn.is-active {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: var(--radius-xs);
+}
+
+.ui-iconbtn:disabled {
+    opacity: .4;
+    cursor: not-allowed
+}
+
+/* Tooltip bubble — всегда в DOM (portal в document.body), visibility управляет видимостью.
+   position/top/left выставляет Floating UI через inline style (strategy:'fixed').   */
+.ui-tt__bubble {
+    background: var(--bg-tooltip);
+    color: #fff;
+    font-size: var(--fs-xs);
+    font-family: var(--font-sans);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    z-index: var(--z-tooltip);
+    box-shadow: var(--shadow-sm);
+    animation: tt-in 80ms var(--ease) both;
+}
+
+@keyframes tt-in {
+    from {
+        opacity: 0;
+        transform: translateY(2px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}

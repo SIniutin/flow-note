@@ -1,0 +1,223 @@
+/* ─── Avatar ───────────────────────────────────────────────────────────────── */
+.ui-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: #fff;
+    font-weight: var(--fw-semibold);
+    flex-shrink: 0
+}
+
+.ui-avatar--1 {
+    background: var(--avatar-1)
+}
+
+.ui-avatar--2 {
+    background: var(--avatar-2)
+}
+
+.ui-avatar--3 {
+    background: var(--avatar-3)
+}
+
+.ui-avatar--4 {
+    background: var(--avatar-4)
+}
+
+/* ─── Comment ──────────────────────────────────────────────────────────────── */
+.ui-comment {
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border-subtle)
+}
+
+.ui-comment.is-resolved {
+    background: var(--accent-soft);
+    border-radius: var(--radius-sm);
+    padding: var(--space-3);
+    border-bottom: none;
+    margin-bottom: var(--space-2)
+}
+
+.ui-comment__head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2)
+}
+
+.ui-comment__meta {
+    flex: 1;
+    min-width: 0
+}
+
+.ui-comment__author {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--text-primary)
+}
+
+.ui-comment__date {
+    font-size: var(--fs-xs);
+    color: var(--text-tertiary)
+}
+
+.ui-comment__badge {
+    font-size: var(--fs-xs);
+    color: var(--text-secondary)
+}
+
+.ui-comment__body {
+    font-size: var(--fs-sm);
+    color: var(--text-primary);
+    margin-top: var(--space-2);
+    padding-left: 36px;
+    line-height: var(--lh-normal)
+}
+
+.ui-comment__replies {
+    margin-top: var(--space-2);
+    padding-left: 36px;
+    border-left: 2px solid var(--border-subtle);
+    margin-left: 14px
+}
+
+/* ─── PageShell — full-page layout ────────────────────────────────────────── */
+
+.ui-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background: var(--bg-surface);
+}
+
+.ui-shell__head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: var(--space-4) var(--space-8);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.ui-shell__title {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+}
+
+.ui-shell__icon {
+    color: var(--accent);
+    font-size: 18px;
+    line-height: 1.4;
+}
+
+.ui-shell__name {
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-semibold);
+    color: var(--text-primary);
+}
+
+.ui-shell__desc {
+    font-size: var(--fs-xs);
+    color: var(--text-tertiary);
+    margin-top: 2px;
+}
+
+.ui-shell__tabs {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    font-size: var(--fs-sm);
+    color: var(--text-secondary);
+}
+
+.ui-shell__toolbar {
+    display: flex;
+    gap: var(--space-1);
+    align-items: center;
+    padding: var(--space-2) var(--space-6);
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    overflow: visible; /* тултипы не обрезаются */
+}
+
+.ui-shell__main {
+    flex: 1;
+    display: flex;
+    align-items: flex-start;
+}
+
+.ui-shell__content {
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-10) var(--space-8);
+    font-size: var(--fs-md);
+    color: var(--text-primary);
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+/* Боковая панель: фиксированная ширина, sticky, с отступом от края */
+.ui-shell__side {
+    width: 300px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 57px;
+    max-height: calc(100vh - 57px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* Отступ от правого края браузера — чтобы панель не была прижата */
+    margin: var(--space-4) var(--space-4) 0 0;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+}
+
+/* SidePanel внутри .ui-shell__side занимает всю ширину контейнера,
+   игнорирует собственный inline width и box-shadow (дан снаружи) */
+.ui-shell__side .ui-side {
+    width: 100% !important;
+    box-shadow: none !important;
+    border-radius: var(--radius-lg);
+    max-height: inherit;
+}
+
+/* ─── Skeleton ─────────────────────────────────────────────────────────────── */
+.ui-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-10) var(--space-8)
+}
+
+.ui-skeleton__bar {
+    height: 14px;
+    background: var(--bg-skeleton);
+    border-radius: var(--radius-xs);
+    animation: ui-shimmer 1.4s ease-in-out infinite
+}
+
+@keyframes ui-shimmer {
+    0%, 100% {
+        opacity: 1
+    }
+    50% {
+        opacity: .55
+    }
+}
+
+/* ─── Footer ───────────────────────────────────────────────────────────────── */
+.ui-shell__footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) var(--space-8);
+    border-top: 1px solid var(--border-subtle);
+    font-size: var(--fs-xs);
+    color: var(--text-tertiary);
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-surface);
+}

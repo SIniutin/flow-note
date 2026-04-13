@@ -1,0 +1,115 @@
+.ProseMirror {
+    outline: none;
+    min-height: 400px;
+    font-size: var(--fs-md);
+    color: var(--text-primary);
+    text-align: left;
+    word-break: break-word;
+    line-height: var(--lh-normal);
+    /* Комфортная ширина строки для чтения — ограничиваем здесь,
+       а не на контейнере, чтобы flex-layout не ломался */
+}
+
+/* Headings */
+.ProseMirror h1 {
+    font-size: var(--fs-3xl);
+    font-weight: var(--fw-bold);
+    line-height: var(--lh-tight);
+    margin: 0 0 var(--space-4);
+    color: var(--text-primary);
+}
+
+.ProseMirror h2 {
+    font-size: var(--fs-2xl);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    margin: var(--space-5) 0 var(--space-3);
+    color: var(--text-primary);
+}
+
+/* Paragraphs */
+.ProseMirror p {
+    margin: 0 0 var(--space-3);
+}
+
+.ProseMirror p:last-child {
+    margin-bottom: 0;
+}
+
+/* Placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--text-tertiary);
+    float: left;
+    pointer-events: none;
+    height: 0;
+}
+
+/* Lists */
+.ProseMirror ul,
+.ProseMirror ol {
+    padding-left: var(--space-5);
+    margin: 0 0 var(--space-3);
+}
+
+.ProseMirror li {
+    margin-bottom: var(--space-1);
+}
+
+/* Blockquote */
+.ProseMirror blockquote {
+    border-left: 3px solid var(--accent);
+    margin: var(--space-3) 0;
+    padding: var(--space-2) var(--space-4);
+    color: var(--text-secondary);
+    font-style: italic;
+    background: var(--accent-soft);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* Inline code */
+.ProseMirror code {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.875em;
+    background: var(--bg-surface-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xs);
+    padding: 1px 5px;
+    color: var(--text-primary);
+    display: inline; /* override любых display:inline-flex от родителей */
+}
+
+/* Code block */
+.ProseMirror pre {
+    background: var(--bg-surface-muted);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    overflow-x: auto;
+    margin: 0 0 var(--space-3);
+}
+
+.ProseMirror pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: var(--fs-sm);
+}
+
+/* Horizontal rule */
+.ProseMirror hr {
+    border: none;
+    border-top: 1px solid var(--border-default);
+    margin: var(--space-5) 0;
+}
+
+/* Images */
+.ProseMirror img {
+    max-width: 100%;
+    border-radius: var(--radius-sm);
+}
+
+.ProseMirror img.ProseMirror-selectednode {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
