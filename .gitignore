@@ -16,3 +16,6 @@ npm-debug.log*
 
 # AI tools
 .codex
+
+# JWT keys (generated locally, never commit)
+secrets/*.pem
