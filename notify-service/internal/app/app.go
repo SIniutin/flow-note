@@ -3,24 +3,30 @@ package app
 import (
 	"context"
 
-	"github.com/redkindanil/flow-note/common/broker"
-	commonrt "github.com/redkindanil/flow-note/common/realtime"
-	"github.com/redkindanil/flow-note/common/runtime/logging"
-	"github.com/redkindanil/flow-note/common/runtime/postgres"
-	"github.com/redkindanil/flow-note/notify-service/internal/config"
-	"github.com/redkindanil/flow-note/notify-service/internal/consumer"
-	"github.com/redkindanil/flow-note/notify-service/internal/repository"
-	"github.com/redkindanil/flow-note/notify-service/internal/service"
+	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/broker"
+	commonrt "github.com/flow-note/common/realtime"
+	grpcruntime "github.com/flow-note/common/runtime/grpcserver"
+	"github.com/flow-note/common/runtime/logging"
+	"github.com/flow-note/common/runtime/postgres"
+	"github.com/flow-note/notify-service/internal/config"
+	"github.com/flow-note/notify-service/internal/consumer"
+	"github.com/flow-note/notify-service/internal/repository"
+	"github.com/flow-note/notify-service/internal/service"
+	grpcHandler "github.com/flow-note/notify-service/internal/transport/grpc"
+	notifyv1 "github.com/flow-note/proto/notify/v1"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 )
 
 type App struct {
-	Config   config.Config
-	Logger   *zap.Logger
-	DB       *postgres.DB
-	Broker   *broker.RabbitMQ
-	Realtime *commonrt.RedisPublisher
-	Consumer *consumer.Consumer
+	Config     config.Config
+	Logger     *zap.Logger
+	DB         *postgres.DB
+	Broker     *broker.RabbitMQ
+	Realtime   *commonrt.RedisPublisher
+	Consumer   *consumer.Consumer
+	GRPCServer *grpcruntime.Server
 }
 
 func New(ctx context.Context, cfg config.Config) (*App, error) {
@@ -37,10 +43,10 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, err
 	}
 	if err := bus.DeclareAndBind(cfg.BrokerQueue, []string{
-		"comment.thread.created", 
-		"comment.created", 
-		"comment.reply.created", 
-		"comment.mention.created", 
+		"comment.thread.created",
+		"comment.created",
+		"comment.reply.created",
+		"comment.mention.created",
 		"page.mention.created",
 	}); err != nil {
 		return nil, err
@@ -49,13 +55,19 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	repo := repository.NewPostgres(db)
 	svc := service.New(repo, realtimePub)
 	consumerWorker := consumer.New(bus, cfg.BrokerQueue, svc)
+	grpcSrv, err := grpcruntime.New(":"+cfg.GRPCPort, grpc.UnaryInterceptor(authctx.UnaryServerInterceptor()))
+	if err != nil {
+		return nil, err
+	}
+	notifyv1.RegisterNotifyServiceServer(grpcSrv.Inner(), grpcHandler.New(svc, realtimePub))
 	return &App{
-		Config:   cfg,
-		Logger:   logger,
-		DB:       db,
-		Broker:   bus,
-		Realtime: realtimePub,
-		Consumer: consumerWorker,
+		Config:     cfg,
+		Logger:     logger,
+		DB:         db,
+		Broker:     bus,
+		Realtime:   realtimePub,
+		Consumer:   consumerWorker,
+		GRPCServer: grpcSrv,
 	}, nil
 }
 

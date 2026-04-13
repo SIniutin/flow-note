@@ -12,6 +12,11 @@ type Publisher interface {
 	Close() error
 }
 
+type Subscriber interface {
+	SubscribeUser(ctx context.Context, userChannel string) (<-chan []byte, error)
+	Close() error
+}
+
 type RedisPublisher struct {
 	client *redis.Client
 }
@@ -32,4 +37,34 @@ func (p *RedisPublisher) PublishUser(ctx context.Context, userChannel string, pa
 
 func (p *RedisPublisher) Close() error {
 	return p.client.Close()
+}
+
+func (p *RedisPublisher) SubscribeUser(ctx context.Context, userChannel string) (<-chan []byte, error) {
+	pubsub := p.client.Subscribe(ctx, userChannel)
+	if _, err := pubsub.Receive(ctx); err != nil {
+		_ = pubsub.Close()
+		return nil, err
+	}
+	out := make(chan []byte)
+	go func() {
+		defer close(out)
+		defer pubsub.Close()
+		ch := pubsub.Channel()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-ch:
+				if !ok {
+					return
+				}
+				select {
+				case out <- []byte(msg.Payload):
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+	return out, nil
 }

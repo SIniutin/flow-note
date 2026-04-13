@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/redkindanil/flow-note/notify-service/internal/app"
-	"github.com/redkindanil/flow-note/notify-service/internal/config"
+	"github.com/flow-note/notify-service/internal/app"
+	"github.com/flow-note/notify-service/internal/config"
 	"go.uber.org/zap"
 )
 
@@ -29,6 +29,14 @@ func main() {
 		}
 	}()
 
+	go func() {
+		if err := application.GRPCServer.Serve(); err != nil {
+			application.Logger.Error("grpc server failed", zap.Error(err))
+			stop()
+		}
+	}()
+
 	<-ctx.Done()
+	application.GRPCServer.GracefulStop()
 	os.Exit(0)
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/flow-note/common/apperrors"
+	commonpg "github.com/flow-note/common/runtime/postgres"
+	"github.com/flow-note/notify-service/internal/domain"
 	"github.com/google/uuid"
-	"github.com/redkindanil/flow-note/common/apperrors"
-	commonpg "github.com/redkindanil/flow-note/common/runtime/postgres"
-	"github.com/redkindanil/flow-note/notify-service/internal/domain"
 )
 
 type Postgres struct {

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/flow-note/comment-service/internal/domain"
+	"github.com/flow-note/common/apperrors"
+	commonpg "github.com/flow-note/common/runtime/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/redkindanil/flow-note/comment-service/internal/domain"
-	"github.com/redkindanil/flow-note/common/apperrors"
-	commonpg "github.com/redkindanil/flow-note/common/runtime/postgres"
 )
 
 type Postgres struct {

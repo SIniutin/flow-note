@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/flow-note/comment-service/internal/clients"
+	"github.com/flow-note/comment-service/internal/domain"
+	"github.com/flow-note/comment-service/internal/producer"
+	"github.com/flow-note/comment-service/internal/repository"
+	"github.com/flow-note/common/apperrors"
+	"github.com/flow-note/common/events"
 	"github.com/google/uuid"
-	"github.com/redkindanil/flow-note/comment-service/internal/clients"
-	"github.com/redkindanil/flow-note/comment-service/internal/domain"
-	"github.com/redkindanil/flow-note/comment-service/internal/producer"
-	"github.com/redkindanil/flow-note/comment-service/internal/repository"
-	"github.com/redkindanil/flow-note/common/apperrors"
-	"github.com/redkindanil/flow-note/common/events"
 )
 
 type Service struct {

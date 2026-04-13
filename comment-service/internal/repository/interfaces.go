@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/flow-note/comment-service/internal/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/redkindanil/flow-note/comment-service/internal/domain"
 )
 
 type TxManager interface {

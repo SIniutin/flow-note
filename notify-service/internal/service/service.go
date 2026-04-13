@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/flow-note/common/events"
+	commonrt "github.com/flow-note/common/realtime"
+	"github.com/flow-note/notify-service/internal/domain"
+	"github.com/flow-note/notify-service/internal/repository"
 	"github.com/google/uuid"
-	"github.com/redkindanil/flow-note/common/events"
-	commonrt "github.com/redkindanil/flow-note/common/realtime"
-	"github.com/redkindanil/flow-note/notify-service/internal/domain"
-	"github.com/redkindanil/flow-note/notify-service/internal/repository"
 )
 
 type Service struct {

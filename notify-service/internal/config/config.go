@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	ServiceName    string
+	GRPCPort       string
 	PostgresDSN    string
 	BrokerURL      string
 	BrokerExchange string
@@ -20,6 +21,7 @@ type Config struct {
 func Load() Config {
 	return Config{
 		ServiceName:    env("NOTIFY_SERVICE_NAME", "notify-service"),
+		GRPCPort:       env("NOTIFY_GRPC_PORT", "9092"),
 		PostgresDSN:    env("NOTIFY_POSTGRES_DSN", "postgres://notify:notify@localhost:5434/notifydb?sslmode=disable"),
 		BrokerURL:      env("BROKER_URL", "amqp://guest:guest@localhost:5672/"),
 		BrokerExchange: env("BROKER_EXCHANGE", "flow.events"),

@@ -36,6 +36,6 @@ type Envelope struct {
 	Payload         json.RawMessage `json:"payload,omitempty"`
 }
 
-func (e Envelope) RoutingKey() string {
+func (e *Envelope) RoutingKey() string {
 	return e.EventType
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/flow-note/common/broker"
+	"github.com/flow-note/common/events"
+	"github.com/flow-note/notify-service/internal/service"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/redkindanil/flow-note/common/broker"
-	"github.com/redkindanil/flow-note/common/events"
-	"github.com/redkindanil/flow-note/notify-service/internal/service"
 )
 
 type Consumer struct {

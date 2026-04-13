@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/flow-note/comment-service/internal/domain"
+	"github.com/flow-note/common/events"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/redkindanil/flow-note/comment-service/internal/domain"
-	"github.com/redkindanil/flow-note/common/events"
 )
 
 type fakePageAccess struct{}
