@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package comment.v1;
+
+option go_package = "github.com/flow-note/proto/comment/v1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// ─── Anchor ──────────────────────────────────────────────────────────────────
+
+message Anchor {
+  string kind           = 1;
+  string block_id       = 2;
+  optional int32 start_offset   = 3;
+  optional int32 end_offset     = 4;
+  string selected_text  = 5;
+  string context_before = 6;
+  string context_after  = 7;
+  string snapshot_id    = 8;
+  string table_id       = 9;
+  string row_id         = 10;
+  string column_id      = 11;
+}
+
+// ─── Body ─────────────────────────────────────────────────────────────────────
+
+message BodyNode {
+  string type    = 1;
+  string text    = 2;
+  string label   = 3;
+  string user_id = 4;
+}
+
+// ─── Thread ───────────────────────────────────────────────────────────────────
+
+message Thread {
+  string id                              = 1;
+  string page_id                         = 2;
+  Anchor anchor                          = 3;
+  string anchor_hash                     = 4;
+  string created_by                      = 5;
+  string status                          = 6;
+  google.protobuf.Timestamp created_at   = 7;
+  google.protobuf.Timestamp updated_at   = 8;
+  optional string resolved_by            = 9;
+  optional google.protobuf.Timestamp resolved_at      = 10;
+  optional google.protobuf.Timestamp last_commented_at = 11;
+  int32 comments_count                   = 12;
+}
+
+message ThreadWithComments {
+  Thread thread          = 1;
+  repeated Comment comments = 2;
+}
+
+// ─── Comment ──────────────────────────────────────────────────────────────────
+
+message Comment {
+  string id                               = 1;
+  string thread_id                        = 2;
+  optional string parent_comment_id       = 3;
+  string author_id                        = 4;
+  repeated BodyNode body                  = 5;
+  string body_text                        = 6;
+  google.protobuf.Timestamp created_at    = 7;
+  google.protobuf.Timestamp updated_at    = 8;
+  optional google.protobuf.Timestamp edited_at  = 9;
+  optional google.protobuf.Timestamp deleted_at = 10;
+  string status                           = 11;
+}
+
+// ─── Requests / Responses ─────────────────────────────────────────────────────
+
+message CreateThreadRequest {
+  string page_id          = 1;
+  Anchor anchor           = 2;
+  repeated BodyNode body  = 3;
+}
+
+message CreateThreadResponse {
+  Thread  thread       = 1;
+  Comment root_comment = 2;
+}
+
+message ListThreadsRequest {
+  string page_id    = 1;
+  bool   active_only = 2;
+  int32  limit      = 3;
+  int32  offset     = 4;
+}
+
+message ListThreadsResponse {
+  repeated Thread items = 1;
+}
+
+message ListDiscussionsRequest {
+  string page_id = 1;
+  int32  limit   = 2;
+  int32  offset  = 3;
+}
+
+message GetThreadRequest {
+  string thread_id = 1;
+}
+
+message GetThreadResponse {
+  ThreadWithComments item = 1;
+}
+
+message AddReplyRequest {
+  string thread_id       = 1;
+  repeated BodyNode body = 2;
+}
+
+message AddReplyResponse {
+  Comment comment = 1;
+}
+
+message ChangeThreadStateRequest {
+  string thread_id = 1;
+}
+
+message DeleteCommentRequest {
+  string comment_id = 1;
+}
+
+message FollowThreadRequest {
+  string thread_id = 1;
+}
+
+// ─── Service ──────────────────────────────────────────────────────────────────
+
+service CommentService {
+  rpc CreateThread(CreateThreadRequest)       returns (CreateThreadResponse);
+  rpc ListThreads(ListThreadsRequest)         returns (ListThreadsResponse);
+  rpc ListDiscussions(ListDiscussionsRequest) returns (ListThreadsResponse);
+  rpc GetThread(GetThreadRequest)             returns (GetThreadResponse);
+  rpc AddReply(AddReplyRequest)               returns (AddReplyResponse);
+  rpc ResolveThread(ChangeThreadStateRequest) returns (google.protobuf.Empty);
+  rpc ReopenThread(ChangeThreadStateRequest)  returns (google.protobuf.Empty);
+  rpc DeleteComment(DeleteCommentRequest)     returns (google.protobuf.Empty);
+  rpc FollowThread(FollowThreadRequest)       returns (google.protobuf.Empty);
+  rpc UnfollowThread(FollowThreadRequest)     returns (google.protobuf.Empty);
+}

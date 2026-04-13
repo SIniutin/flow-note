@@ -174,6 +174,20 @@ services:
       retries: 3
       start_period: 20s
 
+  # ── RabbitMQ ─────────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI: http://localhost:15672 (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   # ── PostgreSQL (auth-service) ────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
@@ -188,6 +202,38 @@ services:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── PostgreSQL (comment-service) ────────────────────────────────────────────
+  postgres-comment:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: comment
+      POSTGRES_PASSWORD: comment
+      POSTGRES_DB: commentdb
+    volumes:
+      - postgres-comment-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comment"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── PostgreSQL (notify-service) ──────────────────────────────────────────────
+  postgres-notify:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: notify
+      POSTGRES_PASSWORD: notify
+      POSTGRES_DB: notifydb
+    volumes:
+      - postgres-notify-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notify"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -218,6 +264,76 @@ services:
       redis:
         condition: service_healthy
 
+
+  # ── Comment-service migrations ───────────────────────────────────────────────
+  comment-migrate:
+    image: ghcr.io/pressly/goose:latest
+    volumes:
+      - ./comment-service/migrations:/migrations
+    command: ["-dir", "/migrations", "postgres", "postgres://comment:comment@postgres-comment:5432/commentdb?sslmode=disable", "up"]
+    depends_on:
+      postgres-comment:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Notify-service migrations ─────────────────────────────────────────────────
+  notify-migrate:
+    image: ghcr.io/pressly/goose:latest
+    volumes:
+      - ./notify-service/migrations:/migrations
+    command: ["-dir", "/migrations", "postgres", "postgres://notify:notify@postgres-notify:5432/notifydb?sslmode=disable", "up"]
+    depends_on:
+      postgres-notify:
+        condition: service_healthy
+    restart: "no"
+
+  # ── Comment Service ───────────────────────────────────────────────────────────
+  comment-service:
+    build:
+      context: .
+      dockerfile: comment-service/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "9091"
+    environment:
+      COMMENT_GRPC_PORT: "9091"
+      COMMENT_POSTGRES_DSN: "postgres://comment:comment@postgres-comment:5432/commentdb?sslmode=disable"
+      BROKER_URL: "amqp://guest:guest@rabbitmq:5672/"
+      BROKER_EXCHANGE: "flow.events"
+      LOG_LEVEL: "info"
+    depends_on:
+      postgres-comment:
+        condition: service_healthy
+      comment-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+
+  # ── Notify Service ────────────────────────────────────────────────────────────
+  notify-service:
+    build:
+      context: .
+      dockerfile: notify-service/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "9092"
+    environment:
+      NOTIFY_GRPC_PORT: "9092"
+      NOTIFY_POSTGRES_DSN: "postgres://notify:notify@postgres-notify:5432/notifydb?sslmode=disable"
+      BROKER_URL: "amqp://guest:guest@rabbitmq:5672/"
+      BROKER_EXCHANGE: "flow.events"
+      NOTIFY_BROKER_QUEUE: "notify-service.events"
+      REDIS_ADDR: "redis:6379"
+      LOG_LEVEL: "info"
+    depends_on:
+      postgres-notify:
+        condition: service_healthy
+      notify-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   # ── Meta-Parser ──────────────────────────────────────────────────────────────
   meta-parser:
@@ -275,6 +391,8 @@ secrets:
 
 volumes:
   postgres-data:
+  postgres-comment-data:
+  postgres-notify-data:
   minio-data:          # Y.Doc snapshots (binary blobs)
   kafka-data:          # Kafka log segments
   mock-pages-snapshots:  # оставлен для совместимости, больше не используется

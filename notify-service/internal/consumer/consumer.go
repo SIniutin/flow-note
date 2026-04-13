@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/flow-note/common/broker"
 	"github.com/flow-note/common/events"
@@ -24,7 +25,7 @@ func (c *Consumer) Run(ctx context.Context) error {
 	return c.broker.Consume(ctx, c.queue, func(ctx context.Context, d amqp.Delivery) error {
 		var envelope events.Envelope
 		if err := json.Unmarshal(d.Body, &envelope); err != nil {
-			return nil
+			return fmt.Errorf("malformed event body: %w", err)
 		}
 		return c.svc.ProcessEvent(ctx, envelope)
 	})

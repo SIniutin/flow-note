@@ -50,7 +50,7 @@ func (a *App) Run(ctx context.Context) error {
 	)
 
 	dialOpts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // BAD
+		grpc.WithTransportCredentials(insecure.NewCredentials()), // OK for internal docker network; add mTLS for prod
 	}
 
 	if err := authpb.RegisterAuthServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.AuthGRPCAddr, dialOpts); err != nil {
