@@ -1,0 +1,15 @@
+/* ─── Reset minimal — не конфликтует с tokens.css ────────────────────────────
+   index.css содержал шаблон Vite с text-align:center на #root и font:18px
+   на :root — это ломало layout редактора и размеры инлайн-узлов.
+   Оставляем только полезные браузерные нормализации.                        */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+:root {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

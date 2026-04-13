@@ -1,0 +1,272 @@
+/* ─── src/editor/mwsTable/tablePickerModal.css ──────────────────────────────── */
+
+/*
+  .ui-modal__body имеет padding: var(--space-5).
+  .tpm-body убирает этот отступ отрицательными margin, чтобы
+  search-bar и список касались краёв модального окна (full-bleed layout).
+*/
+.tpm-body {
+    margin: calc(-1 * var(--space-5));
+}
+
+/* ── Поисковая строка ───────────────────────────────────────────────────────── */
+
+.tpm-search {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.tpm-search__icon {
+    font-size: var(--fs-sm);
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+}
+
+.tpm-search__input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: var(--fs-sm);
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+}
+
+.tpm-search__input::placeholder {
+    color: var(--text-tertiary);
+}
+
+/* ── Список таблиц ──────────────────────────────────────────────────────────── */
+
+.tpm-list {
+    max-height: 240px;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: var(--space-1) 0;
+}
+
+.tpm-list__empty {
+    padding: var(--space-4) var(--space-3);
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-tertiary);
+}
+
+/* ── Элемент списка ─────────────────────────────────────────────────────────── */
+
+.tpm-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    border: none;
+    background: transparent;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    text-align: left;
+    transition: background var(--dur-fast) var(--ease);
+    border-radius: 0;
+}
+
+.tpm-item:hover,
+.tpm-item.is-hovered {
+    background: var(--bg-row-hover);
+}
+
+.tpm-item.is-selected {
+    background: var(--accent-soft);
+}
+
+.tpm-item__icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.tpm-item__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.tpm-item__name {
+    display: block;
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tpm-item__desc {
+    display: block;
+    font-size: var(--fs-xs);
+    color: var(--text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 1px;
+}
+
+.tpm-item__meta {
+    font-size: var(--fs-xs);
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+}
+
+.tpm-item__links {
+    font-size: var(--fs-xs);
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: var(--radius-pill);
+    padding: 1px 6px;
+    flex-shrink: 0;
+}
+
+.tpm-item__check {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-bold);
+    color: var(--accent);
+    flex-shrink: 0;
+}
+
+/* ── Панель опций ────────────────────────────────────────────────────────────── */
+
+.tpm-opts {
+    padding: var(--space-3);
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-surface-muted);
+}
+
+.tpm-opts__label {
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: var(--space-2);
+}
+
+.tpm-opts__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin-bottom: var(--space-2);
+}
+
+.tpm-opts__key {
+    font-size: var(--fs-xs);
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+/* ── Сегментированная кнопка ─────────────────────────────────────────────────── */
+
+.tpm-seg {
+    display: flex;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.tpm-seg__btn {
+    padding: 2px var(--space-2);
+    font-size: var(--fs-xs);
+    font-family: var(--font-sans);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
+}
+
+.tpm-seg__btn:not(:last-child) {
+    border-right: 1px solid var(--border-default);
+}
+
+.tpm-seg__btn.is-active {
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: var(--fw-semibold);
+}
+
+/* ── Числовой инпут ──────────────────────────────────────────────────────────── */
+
+.tpm-number {
+    width: 60px;
+    padding: 3px var(--space-2);
+    font-size: var(--fs-xs);
+    font-family: var(--font-sans);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    text-align: center;
+    outline: none;
+    transition: border-color var(--dur-fast) var(--ease);
+}
+
+.tpm-number:focus {
+    border-color: var(--border-focus);
+}
+
+/* ── Подвал модального окна ─────────────────────────────────────────────────── */
+
+.tpm-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+}
+
+.tpm-foot__hint {
+    font-size: var(--fs-xs);
+    color: var(--text-tertiary);
+}
+
+.tpm-foot__actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+.tpm-btn {
+    padding: 6px var(--space-4);
+    font-size: var(--fs-sm);
+    font-family: var(--font-sans);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease),
+                opacity     var(--dur-fast) var(--ease);
+}
+
+.tpm-btn--cancel {
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+.tpm-btn--cancel:hover {
+    background: var(--bg-surface-muted);
+}
+
+.tpm-btn--insert {
+    border: none;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    font-weight: var(--fw-semibold);
+}
+
+.tpm-btn--insert:hover {
+    background: var(--accent-hover);
+}
+
+.tpm-btn--insert:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    background: var(--accent);
+}

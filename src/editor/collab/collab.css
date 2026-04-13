@@ -1,0 +1,80 @@
+/* ─── src/editor/collab/collab.css ──────────────────────────────────────────── */
+
+/* ── Presence avatars (toolbar) ─────────────────────────────────────────────── */
+
+.presence {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-left: var(--space-2);
+}
+
+.presence__avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-surface);
+    cursor: default;
+    flex-shrink: 0;
+    transition: transform var(--dur-fast) var(--ease);
+}
+
+.presence__avatar:hover {
+    transform: scale(1.15);
+    z-index: 99 !important;
+}
+
+.presence__label {
+    font-size: var(--fs-xs);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* ── Collaboration cursors ───────────────────────────────────────────────────── */
+
+.collaboration-cursor__caret {
+    border-left: 2px solid;
+    border-right: 2px solid;
+    margin-left: -1px;
+    margin-right: -1px;
+    pointer-events: none;
+    position: relative;
+    word-break: normal;
+}
+
+.collaboration-cursor__label {
+    border-radius: var(--radius-xs) var(--radius-xs) var(--radius-xs) 0;
+    color: #fff;
+    font-size: 10px;
+    font-family: var(--font-sans);
+    font-style: normal;
+    font-weight: var(--fw-semibold);
+    left: -1px;
+    line-height: 1.4;
+    padding: 1px 5px;
+    position: absolute;
+    top: -1.6em;
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: none;
+    /* Скрываем лейбл по умолчанию, показываем при hover на курсор */
+    opacity: 0;
+    transition: opacity var(--dur-fast) var(--ease);
+}
+
+/* Показываем имя при наведении на каретку */
+.collaboration-cursor__caret:hover .collaboration-cursor__label,
+.collaboration-cursor__label.is-visible {
+    opacity: 1;
+}
+
+/* Выделение чужого текста */
+.collaboration-cursor__selection {
+    opacity: 0.2;
+}

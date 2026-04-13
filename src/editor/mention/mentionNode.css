@@ -1,0 +1,29 @@
+/* ── Mention badge ────────────────────────────────────────────────────────────
+   display: inline — не inline-block, потому что inline-block в центрованном
+   тексте визуально "растягивается" на всю строку.
+   Используем inline + vertical-align для правильного отображения.          */
+
+.ui-mention {
+    display: inline;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: var(--fw-medium);
+    font-size: 0.9em;
+    cursor: default;
+    user-select: all;
+    color: #fff;
+    white-space: nowrap;
+    /* Не позволяем браузеру разбивать бейдж переносом строки */
+    overflow-wrap: normal;
+    word-break: keep-all;
+}
+
+.ui-mention--1 { background: var(--avatar-1); color: #1f1f1f; }
+.ui-mention--2 { background: var(--avatar-2); }
+.ui-mention--3 { background: var(--avatar-3); color: #1f1f1f; }
+.ui-mention--4 { background: var(--avatar-4); }
+
+.ui-mention.ProseMirror-selectednode {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}

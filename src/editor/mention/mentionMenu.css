@@ -1,0 +1,8 @@
+.mention-menu{list-style:none;margin:0;padding:0;max-height:280px;overflow-y:auto}
+.mention-menu__item{display:flex;align-items:center;gap:var(--space-2);
+    padding:var(--space-2) var(--space-2);border-radius:var(--radius-sm);
+    cursor:pointer;font-size:var(--fs-sm)}
+.mention-menu__item.is-active{background:var(--accent-soft)}
+.mention-menu__text{display:flex;flex-direction:column;min-width:0}
+.mention-menu__name{color:var(--text-primary);font-weight:var(--fw-medium)}
+.mention-menu__role{color:var(--text-tertiary);font-size:var(--fs-xs)}
