@@ -1,6 +1,0 @@
-./init.go
-./init_opaque.go
-./main.go
-./opaque.go
-./reflect.go
-./well_known_types.go

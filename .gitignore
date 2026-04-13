@@ -3,3 +3,27 @@
 bin/
 dist/
 coverage.out
+
+# Local Go tooling caches
+.gocache/
+.gomodcache/
+.cache/
+
+# Local codegen / tool binaries
+.bin/
+
+# Build outputs
+*.test
+*.out
+
+# Logs
+*.log
+
+# IDE / editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS noise
+**/.DS_Store
