@@ -10,3 +10,9 @@ dist/
 npm-debug.log*
 
 .DS_Store
+
+# Go build cache
+.gocache/
+
+# AI tools
+.codex
