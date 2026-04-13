@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/tasker-iniutin/auth-service/internal/app"
+	"github.com/flow-note/auth-service/internal/app"
 )
 
 func main() {

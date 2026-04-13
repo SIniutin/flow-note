@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 
-	d "github.com/tasker-iniutin/auth-service/internal/domain"
+	d "github.com/flow-note/auth-service/internal/domain"
 	sec "github.com/tasker-iniutin/common/authsecurity"
 )
 

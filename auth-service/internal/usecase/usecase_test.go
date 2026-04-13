@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	d "github.com/flow-note/auth-service/internal/domain"
+	"github.com/flow-note/auth-service/internal/store/mem"
 	"github.com/google/uuid"
-	d "github.com/tasker-iniutin/auth-service/internal/domain"
-	"github.com/tasker-iniutin/auth-service/internal/store/mem"
 	sec "github.com/tasker-iniutin/common/authsecurity"
 	"golang.org/x/crypto/bcrypt"
 )

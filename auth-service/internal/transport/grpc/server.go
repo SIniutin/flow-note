@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	d "github.com/tasker-iniutin/auth-service/internal/domain"
-	uc "github.com/tasker-iniutin/auth-service/internal/usecase"
+	d "github.com/flow-note/auth-service/internal/domain"
+	uc "github.com/flow-note/auth-service/internal/usecase"
 
-	pb "github.com/tasker-iniutin/auth-service/proto/auth/v1"
+	pb "github.com/flow-note/auth-service/generated/proto/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -18,7 +18,7 @@ type Server struct {
 	pb.UnimplementedAuthServiceServer
 
 	login    *uc.LoginUser
-	logout  *uc.LogoutUser
+	logout   *uc.LogoutUser
 	refresh  *uc.RefreshUser
 	register *uc.RegisterUser
 }
@@ -26,7 +26,7 @@ type Server struct {
 func NewServer(reg *uc.RegisterUser, login *uc.LoginUser, ref *uc.RefreshUser, logout *uc.LogoutUser) *Server {
 	return &Server{
 		login:    login,
-		logout:  logout,
+		logout:   logout,
 		refresh:  ref,
 		register: reg,
 	}

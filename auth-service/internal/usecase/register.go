@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	d "github.com/tasker-iniutin/auth-service/internal/domain"
+	d "github.com/flow-note/auth-service/internal/domain"
 	sec "github.com/tasker-iniutin/common/authsecurity"
 )
 

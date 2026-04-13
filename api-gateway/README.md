@@ -36,7 +36,6 @@ Shared infrastructure lives in `common`:
 HTTP endpoints are generated from protobuf annotations in `api-contracts`:
 
 - `api-contracts/proto/auth/v1alpha/auth.proto`
-- `api-contracts/proto/task/v1/task.proto`
 
 ## Auth Behavior
 
@@ -59,8 +58,8 @@ Configuration is provided through environment variables.
 Main variables:
 
 - `GATEWAY_ADDR`
-- `TASK_GRPC_ADDR`
 - `AUTH_GRPC_ADDR`
+- `COLLAB_ADDR`
 - `JWT_PUBLIC_KEY_PEM`
 - `JWT_ISSUER`
 - `JWT_AUDIENCE`
@@ -83,8 +82,8 @@ go run ./cmd/gateway
 Defaults:
 
 - HTTP: `:8080`
-- Task gRPC: `127.0.0.1:50051`
 - Auth gRPC: `127.0.0.1:50052`
+- Collab upstream: `127.0.0.1:4000`
 
 ## Testing
 

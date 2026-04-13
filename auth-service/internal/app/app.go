@@ -3,18 +3,18 @@ package app
 import (
 	"context"
 
+	authpb "github.com/flow-note/auth-service/generated/proto/v1"
 	"github.com/redis/go-redis/v9"
-	authpb "github.com/tasker-iniutin/auth-service/proto/auth/v1"
 	sec "github.com/tasker-iniutin/common/authsecurity"
-	"github.com/tasker-iniutin/common/postgres"
-	"github.com/tasker-iniutin/common/runtime"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
-	"github.com/tasker-iniutin/auth-service/internal/store/postgre"
-	redrepo "github.com/tasker-iniutin/auth-service/internal/store/redis"
-	handlergrpc "github.com/tasker-iniutin/auth-service/internal/transport/grpc"
-	"github.com/tasker-iniutin/auth-service/internal/usecase"
+	"github.com/flow-note/auth-service/internal/store/postgre"
+	redrepo "github.com/flow-note/auth-service/internal/store/redis"
+	handlergrpc "github.com/flow-note/auth-service/internal/transport/grpc"
+	"github.com/flow-note/auth-service/internal/usecase"
+	"github.com/tasker-iniutin/common/postgres"
+	"github.com/tasker-iniutin/common/runtime"
 )
 
 type App struct {

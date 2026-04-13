@@ -6,9 +6,9 @@ import (
 	"os"
 	"testing"
 
+	d "github.com/flow-note/auth-service/internal/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	d "github.com/tasker-iniutin/auth-service/internal/domain"
 )
 
 func TestUserRepoCreateAndRead(t *testing.T) {

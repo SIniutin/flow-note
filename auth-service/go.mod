@@ -1,4 +1,4 @@
-module github.com/tasker-iniutin/auth-service
+module github.com/flow-note/auth-service
 
 go 1.25.0
 

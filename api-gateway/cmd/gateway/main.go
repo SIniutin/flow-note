@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/tasker-iniutin/api-gateway/internal/app"
+	"github.com/flow-note/api-gateway/internal/app"
 )
 
 func main() {

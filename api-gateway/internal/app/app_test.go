@@ -16,8 +16,7 @@ import (
 	"testing"
 	"time"
 
-	authpb "github.com/tasker-iniutin/api-gateway/proto/auth/v1"
-	taskpb "github.com/tasker-iniutin/api-gateway/proto/task/v1"
+	authpb "github.com/flow-note/auth-service/generated/proto/v1"
 	sec "github.com/tasker-iniutin/common/authsecurity"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -55,57 +54,9 @@ func (s *fakeAuthServer) Logout(ctx context.Context, req *authpb.LogoutRequest) 
 	return &emptypb.Empty{}, nil
 }
 
-type fakeTaskServer struct {
-	taskpb.UnimplementedTaskServiceServer
-}
-
-func (s *fakeTaskServer) CreateTask(ctx context.Context, req *taskpb.CreateTaskRequest) (*taskpb.Task, error) {
-	return &taskpb.Task{
-		Id:     "1",
-		UserId: "1",
-		Title:  req.GetTitle(),
-		Text:   req.GetText(),
-		Status: taskpb.TaskStatus_TASK_STATUS_NEW,
-	}, nil
-}
-
-func (s *fakeTaskServer) GetTask(ctx context.Context, req *taskpb.GetTaskRequest) (*taskpb.Task, error) {
-	return &taskpb.Task{
-		Id:     req.GetId(),
-		UserId: "1",
-		Title:  "task",
-		Text:   "text",
-		Status: taskpb.TaskStatus_TASK_STATUS_NEW,
-	}, nil
-}
-
-func (s *fakeTaskServer) ListTasks(ctx context.Context, req *taskpb.ListTasksRequest) (*taskpb.ListTasksResponse, error) {
-	return &taskpb.ListTasksResponse{
-		Tasks: []*taskpb.Task{
-			{Id: "1", UserId: "1", Title: "task", Text: "text", Status: taskpb.TaskStatus_TASK_STATUS_NEW},
-		},
-		Total: 1,
-	}, nil
-}
-
-func (s *fakeTaskServer) UpdateTask(ctx context.Context, req *taskpb.UpdateTaskRequest) (*taskpb.Task, error) {
-	return &taskpb.Task{
-		Id:     req.GetId(),
-		UserId: "1",
-		Title:  req.GetTitle(),
-		Text:   req.GetText(),
-		Status: req.GetStatus(),
-	}, nil
-}
-
-func (s *fakeTaskServer) DeleteTask(ctx context.Context, req *taskpb.DeleteTaskRequest) (*emptypb.Empty, error) {
-	return &emptypb.Empty{}, nil
-}
-
-func TestRunServesHealthAndProxiesAuthAndTask(t *testing.T) {
+func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 	authAddr := startAuthTestGRPCServer(t)
-	taskAddr := startTaskTestGRPCServer(t)
-	keyPath, token := createGatewayTestKeyPair(t)
+	keyPath, _ := createGatewayTestKeyPair(t)
 	httpAddr := freeTCPAddr(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -113,8 +64,8 @@ func TestRunServesHealthAndProxiesAuthAndTask(t *testing.T) {
 
 	a := New(Config{
 		HTTPAddr:      httpAddr,
-		TaskGRPCAddr:  taskAddr,
 		AuthGRPCAddr:  authAddr,
+		CollabAddr:    "127.0.0.1:4000",
 		PublicKeyPath: keyPath,
 		JWTIssuer:     "todo-auth",
 		JWTAudience:   "todo-api",
@@ -156,27 +107,6 @@ func TestRunServesHealthAndProxiesAuthAndTask(t *testing.T) {
 		t.Fatal("expected user field in auth response")
 	}
 
-	req, err := http.NewRequest(http.MethodGet, "http://"+httpAddr+"/v1/tasks", nil)
-	if err != nil {
-		t.Fatalf("build tasks request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("tasks request: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.StatusCode)
-	}
-	var listBody map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&listBody); err != nil {
-		t.Fatalf("decode tasks response: %v", err)
-	}
-	_ = resp.Body.Close()
-	if listBody["tasks"] == nil {
-		t.Fatal("expected tasks field in list response")
-	}
-
 	cancel()
 	select {
 	case err := <-errCh:
@@ -197,20 +127,6 @@ func startAuthTestGRPCServer(t *testing.T) string {
 	}
 	srv := grpc.NewServer()
 	authpb.RegisterAuthServiceServer(srv, &fakeAuthServer{})
-	go func() { _ = srv.Serve(lis) }()
-	t.Cleanup(srv.Stop)
-	return lis.Addr().String()
-}
-
-func startTaskTestGRPCServer(t *testing.T) string {
-	t.Helper()
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		skipIfListenForbidden(t, err)
-		t.Fatalf("listen task grpc: %v", err)
-	}
-	srv := grpc.NewServer()
-	taskpb.RegisterTaskServiceServer(srv, &fakeTaskServer{})
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(srv.Stop)
 	return lis.Addr().String()

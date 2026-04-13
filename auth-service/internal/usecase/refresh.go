@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	d "github.com/flow-note/auth-service/internal/domain"
 	"github.com/google/uuid"
-	d "github.com/tasker-iniutin/auth-service/internal/domain"
 	sec "github.com/tasker-iniutin/common/authsecurity"
 )
 

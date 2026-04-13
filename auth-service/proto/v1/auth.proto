@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package auth.v1;
 
-option go_package = "github.com/tasker-iniutin/api-contracts/auth/v1";
+option go_package = "github.com/flow-note/auth-service/generated/go/proto/v1";
 
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";

@@ -15,10 +15,7 @@ import { loadTable, hasTable } from "./mws/tableRegistry";
 import { MwsUnavailableError } from "./mws/mwsClient";
 import { handleTblOp, TblOpMessage } from "./handlers/tblOpHandler";
 import { startRoutingServer } from "./routingServer";
-<<<<<<< HEAD
 import { verifyToken } from "./auth/jwtVerifier";
-=======
->>>>>>> 5b04681 (feat v1 collab service)
 
 import { config } from "./config";
 
@@ -38,10 +35,7 @@ let shuttingDown = false;
 
 interface ConnContext {
   token: string;
-<<<<<<< HEAD
   userId: string;
-=======
->>>>>>> 5b04681 (feat v1 collab service)
   socketId: string;
 }
 
@@ -55,7 +49,6 @@ const server = Server.configure({
       throw new Error("Server is shutting down");
     }
     console.log(`[auth] socket=${socketId}  doc=${documentName}  token=${token ? `"${token.slice(0, 8)}…"` : "MISSING"}`);
-<<<<<<< HEAD
 
     // // ── Mock auth (local dev without auth-service) ──────────────────────────
     // // Uncomment to skip JWT verification and accept any non-empty token.
@@ -78,15 +71,6 @@ const server = Server.configure({
     (context as ConnContext).userId   = userId;
     (context as ConnContext).socketId = socketId;
     console.log(`[auth] OK  socket=${socketId}  user=${userId}`);
-=======
-    if (!token) {
-      console.warn(`[auth] REJECTED socket=${socketId} — no token`);
-      throw new Error("Unauthorized: token required");
-    }
-    (context as ConnContext).token    = token;
-    (context as ConnContext).socketId = socketId;
-    console.log(`[auth] OK  socket=${socketId}`);
->>>>>>> 5b04681 (feat v1 collab service)
   },
 
   // ── onLoadDocument ───────────────────────────────────────────────────────────

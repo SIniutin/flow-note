@@ -1,4 +1,4 @@
-module github.com/tasker-iniutin/api-gateway
+module github.com/flow-note/api-gateway
 
 go 1.25.0
 
@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/flow-note/auth-service v0.0.0-00010101000000-000000000000
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	go.uber.org/zap v1.27.1
@@ -20,3 +21,5 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260209200024-4cfbd4190f57
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260226221140-a57be14db171 // indirect
 )
+
+replace github.com/flow-note/auth-service => ../auth-service
