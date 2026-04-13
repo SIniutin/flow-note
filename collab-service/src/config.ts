@@ -50,4 +50,10 @@ export const config = {
   // ── Redis TTL ─────────────────────────────────────────────────────────────
   /** TTL ключа collab:page:* в Redis, секунды (обновляется при периодическом flush) */
   redisTtlSec:      int("REDIS_TTL_SEC", 86_400),  // 24 h
+
+  // ── JWT ───────────────────────────────────────────────────────────────────
+  /** RSA public key PEM для верификации JWT (path к файлу или сам PEM-текст) */
+  jwtPublicKeyPem:  str("JWT_PUBLIC_KEY_PEM", ""),
+  jwtIssuer:        str("JWT_ISSUER",         "flow-note-auth"),
+  jwtAudience:      str("JWT_AUDIENCE",       "flow-note-api"),
 } as const;

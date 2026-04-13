@@ -15,6 +15,7 @@ import { loadTable, hasTable } from "./mws/tableRegistry";
 import { MwsUnavailableError } from "./mws/mwsClient";
 import { handleTblOp, TblOpMessage } from "./handlers/tblOpHandler";
 import { startRoutingServer } from "./routingServer";
+import { verifyToken } from "./auth/jwtVerifier";
 
 import { config } from "./config";
 
@@ -34,6 +35,7 @@ let shuttingDown = false;
 
 interface ConnContext {
   token: string;
+  userId: string;
   socketId: string;
 }
 
@@ -47,13 +49,28 @@ const server = Server.configure({
       throw new Error("Server is shutting down");
     }
     console.log(`[auth] socket=${socketId}  doc=${documentName}  token=${token ? `"${token.slice(0, 8)}…"` : "MISSING"}`);
-    if (!token) {
-      console.warn(`[auth] REJECTED socket=${socketId} — no token`);
-      throw new Error("Unauthorized: token required");
+
+    // // ── Mock auth (local dev without auth-service) ──────────────────────────
+    // // Uncomment to skip JWT verification and accept any non-empty token.
+    // if (!token) {
+    //   console.warn(`[auth] REJECTED socket=${socketId} — no token`);
+    //   throw new Error("Unauthorized: token required");
+    // }
+    // const userId = "mock-user";
+
+    // ── Real JWT verification ───────────────────────────────────────────────
+    let userId: string;
+    try {
+      ({ userId } = verifyToken(token));
+    } catch (err) {
+      console.warn(`[auth] REJECTED socket=${socketId}: ${(err as Error).message}`);
+      throw new Error("Unauthorized: invalid token");
     }
+
     (context as ConnContext).token    = token;
+    (context as ConnContext).userId   = userId;
     (context as ConnContext).socketId = socketId;
-    console.log(`[auth] OK  socket=${socketId}`);
+    console.log(`[auth] OK  socket=${socketId}  user=${userId}`);
   },
 
   // ── onLoadDocument ───────────────────────────────────────────────────────────

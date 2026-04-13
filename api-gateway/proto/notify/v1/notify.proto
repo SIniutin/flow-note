@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package notify.v1;
+
+option go_package = "github.com/tasker-iniutin/api-contracts/notify/v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_TYPE_TASK_CREATED = 1;
+  NOTIFICATION_TYPE_TASK_COMPLETED = 2;
+  NOTIFICATION_TYPE_TASK_DELETED = 3;
+}
+
+enum NotificationEventType {
+  NOTIFICATION_EVENT_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_EVENT_TYPE_CREATED = 1;
+  NOTIFICATION_EVENT_TYPE_UPDATED = 2;
+  NOTIFICATION_EVENT_TYPE_DELETED = 3;
+  NOTIFICATION_EVENT_TYPE_HEARTBEAT = 4;
+}
+
+message Notification {
+  string id = 1;
+  NotificationType type = 2;
+  string task_id = 3;
+
+  string title = 4;
+  string body = 5;
+
+  bool read = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message CreateNotificationRequest {
+  string idempotency_key = 1;
+
+  string user_id = 2;
+  NotificationType type = 3;
+  string task_id = 4;
+
+  string title = 5;
+  string body = 6;
+}
+
+message CreateNotificationResponse {
+  Notification notification = 1;
+}
+
+message GetNotificationRequest {
+  string notification_id = 1;
+}
+
+message ListNotificationsRequest {
+  uint32 page_size = 1;
+  string page_token = 2;
+  bool unread_only = 3;
+}
+
+message ListNotificationsResponse {
+  repeated Notification notifications = 1;
+  string next_page_token = 2;
+}
+
+message MarkReadRequest {
+  string notification_id = 1;
+}
+
+message MarkReadResponse {
+  Notification notification = 1;
+}
+
+message DeleteNotificationRequest {
+  string notification_id = 1;
+}
+
+message DeleteNotificationResponse {}
+
+message NotificationStreamRequest {}
+
+message NotificationEvent {
+  NotificationEventType type = 1;
+  Notification notification = 2;
+  string notification_id = 3;
+}
+
+service InternalNotifyService {
+  rpc CreateNotification(CreateNotificationRequest)
+      returns (CreateNotificationResponse);
+}
+
+service NotifyService {
+  rpc GetNotification(GetNotificationRequest) returns (Notification) {
+    option (google.api.http) = {
+      get: "/v1/notifications/{notification_id}"
+    };
+  }
+
+  rpc ListNotifications(ListNotificationsRequest)
+      returns (ListNotificationsResponse) {
+    option (google.api.http) = {
+      get: "/v1/notifications"
+    };
+  }
+
+  rpc MarkRead(MarkReadRequest) returns (MarkReadResponse) {
+    option (google.api.http) = {
+      post: "/v1/notifications/{notification_id}:mark-read"
+      body: "*"
+    };
+  }
+
+  rpc DeleteNotification(DeleteNotificationRequest)
+      returns (DeleteNotificationResponse) {
+    option (google.api.http) = {
+      delete: "/v1/notifications/{notification_id}"
+    };
+  }
+
+  rpc NotificationStream(NotificationStreamRequest)
+      returns (stream NotificationEvent);
+}

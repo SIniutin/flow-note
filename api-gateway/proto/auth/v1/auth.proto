@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package auth.v1;
+
+option go_package = "github.com/tasker-iniutin/api-contracts/auth/v1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+message User {
+    string id = 1;
+    string email = 2;
+    string login = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+}
+
+message RegisterRequest {
+    string email = 1;
+    string login = 2;
+    string password = 3;
+}
+
+message LoginRequest {
+    oneof identifier {
+      string email = 1;
+      string login = 2;
+    }
+    string password = 3;
+}
+
+message TokenPair {
+    string access_token = 1;
+    string refresh_token = 2;
+}
+
+message AuthResponse {
+    User user = 1;
+    TokenPair tokens = 2;
+}
+
+message RefreshRequest {
+  string refresh_token = 1;
+}
+
+message LogoutRequest {
+  string refresh_token = 1;
+}
+
+service AuthService {
+  rpc Register(RegisterRequest) returns (AuthResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/register"
+      body: "*"
+    };
+  }
+
+  rpc Login(LoginRequest) returns (AuthResponse) {
+    option (google.api.http) = {
+      post: "/v1/auth/login"
+      body: "*"
+    };
+  }
+
+  rpc Refresh(RefreshRequest) returns (TokenPair) {
+    option (google.api.http) = {
+      post: "/v1/auth/refresh"
+      body: "*"
+    };
+  }
+
+  rpc Logout(LogoutRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout"
+      body: "*"
+    };
+  }
+}

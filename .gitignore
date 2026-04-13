@@ -1,0 +1,3 @@
+secrets/*.pem
+bin/
+node_modules/
