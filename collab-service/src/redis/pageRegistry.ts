@@ -35,3 +35,13 @@ export async function getPageInstance(
 ): Promise<string | null> {
   return redis.get(`collab:page:${pageId}`);
 }
+
+/** Сохраняет s3_key последнего успешного snapshot — используется при восстановлении документа */
+export async function setLastSnapshotKey(pageId: string, s3Key: string): Promise<void> {
+  await redis.set(`collab:snapshot:${pageId}`, s3Key);
+}
+
+/** Возвращает s3_key последнего snapshot, или null если страница новая */
+export async function getLastSnapshotKey(pageId: string): Promise<string | null> {
+  return redis.get(`collab:snapshot:${pageId}`);
+}

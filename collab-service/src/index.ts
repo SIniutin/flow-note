@@ -9,8 +9,10 @@ import {
 } from "@hocuspocus/server";
 import * as Y from "yjs";
 import { createDocHandle, DocHandle } from "./flush/docFlusher";
-import { registerPage, unregisterPage } from "./redis/pageRegistry";
-import { getSnapshot } from "./grpc/pagesClient";
+import { registerPage, unregisterPage, getLastSnapshotKey } from "./redis/pageRegistry";
+import { downloadByKey, ensureBucketLifecycle }  from "./storage/s3Client";
+import { disconnectProducer } from "./kafka/producer";
+import { startOutboxPublisher } from "./kafka/outboxPublisher";
 import { loadTable, hasTable } from "./mws/tableRegistry";
 import { MwsUnavailableError } from "./mws/mwsClient";
 import { handleTblOp, TblOpMessage } from "./handlers/tblOpHandler";
@@ -21,12 +23,10 @@ import { config } from "./config";
 // page_id → DocHandle (ссылка на hocuspocus Y.Doc + flush-таймеры)
 const docs = new Map<string, DocHandle>();
 
-// page_id → Set<dst_id> — кеш dst_id всех mws_table-блоков документа.
-// Пополняется при первом load и через observeDeep; позволяет не пересканировать
-// дерево в onChange, а сразу знать о новых таблицах.
+// page_id → Set<dst_id> — кеш dst_id всех mws_table-блоков документа
 const docTableIds = new Map<string, Set<string>>();
 
-// page_id → функция отписки от observeDeep (вызывается при уничтожении документа)
+// page_id → функция отписки от observeDeep
 const docObservers = new Map<string, () => void>();
 
 // Флаг graceful shutdown — onAuthenticate отклоняет новые соединения
@@ -49,7 +49,7 @@ const server = Server.configure({
     console.log(`[auth] socket=${socketId}  doc=${documentName}  token=${token ? `"${token.slice(0, 8)}…"` : "MISSING"}`);
     if (!token) {
       console.warn(`[auth] REJECTED socket=${socketId} — no token`);
-      throw new Error("Unauthorized: token required");
+      throw new Error("Unauthorized");
     }
     (context as ConnContext).token    = token;
     (context as ConnContext).socketId = socketId;
@@ -57,8 +57,6 @@ const server = Server.configure({
   },
 
   // ── onLoadDocument ───────────────────────────────────────────────────────────
-  // Вызывается один раз при первом подключении к документу.
-  // Последующие клиенты к тому же page переиспользуют уже поднятый Y.Doc.
   async onLoadDocument({ documentName, context, document, socketId }: onLoadDocumentPayload) {
     const pageId = documentName;
     const { token } = context as ConnContext;
@@ -67,30 +65,31 @@ const server = Server.configure({
     console.log(`[doc] onLoadDocument  page=${pageId}  socket=${socketId}  firstLoad=${isFirstLoad}`);
 
     if (isFirstLoad) {
-      // 1. Восстанавливаем Y.Doc из последнего snapshot pages-service
+      // 1. Восстанавливаем Y.Doc из последнего snapshot в S3
       try {
-        const blob = await getSnapshot(pageId);
-        if (blob) {
-          Y.applyUpdate(document, blob);
-          console.log(`[doc] snapshot restored  page=${pageId}  bytes=${blob.byteLength}`);
+        const s3Key = await getLastSnapshotKey(pageId);
+        if (s3Key) {
+          const blob = await downloadByKey(s3Key);
+          if (blob) {
+            Y.applyUpdate(document, blob);
+            console.log(`[doc] snapshot restored  page=${pageId}  key=${s3Key}  bytes=${blob.byteLength}`);
+          } else {
+            console.log(`[doc] snapshot key found but object missing  page=${pageId}  key=${s3Key}`);
+          }
         } else {
-          console.log(`[doc] no snapshot found — new document  page=${pageId}`);
+          console.log(`[doc] no snapshot — new document  page=${pageId}`);
         }
       } catch (err) {
-        // pages-service недоступен — поднимаем пустой документ, не блокируем соединение
-        console.error(`[doc] getSnapshot failed — starting empty  page=${pageId}:`, (err as Error).message);
+        console.error(`[doc] restore failed — starting empty  page=${pageId}:`, (err as Error).message);
       }
 
-      // 2. Регистрируем handle (привязывает flush-таймеры к этому Y.Doc).
-      //    onDestroy вызывается handle.destroy() СИНХРОННО в начале — docs.delete
-      //    происходит сразу, новое подключение к той же странице получит isFirstLoad=true
-      //    и создаст свежий handle без гонки двойных таймеров.
+      // 2. Регистрируем handle; onDestroy вызывается синхронно в начале destroy()
       const handle = createDocHandle(pageId, document, (id) => {
         docs.delete(id);
         docTableIds.delete(id);
         docObservers.get(id)?.();
         docObservers.delete(id);
-        unregisterPage(id).catch((e) =>
+        unregisterPage(id).catch((e: unknown) =>
           console.error(`[registry] unregister failed  page=${id}:`, e)
         );
       });
@@ -106,7 +105,7 @@ const server = Server.configure({
         console.log(`[doc] mws tables found  page=${pageId}  tables=[${[...knownIds].join(", ")}]`);
         await Promise.allSettled(
           [...knownIds].map((dstId) =>
-            loadTable(dstId, token).catch((e) => {
+            loadTable(dstId, token).catch((e: unknown) => {
               console.error(`[mws] load table failed  dst=${dstId}:`, e);
               if (e instanceof MwsUnavailableError) {
                 document.broadcastStateless(
@@ -118,8 +117,7 @@ const server = Server.configure({
         );
       }
 
-      // 4. Подписка на изменения фрагмента — подгружаем НОВЫЕ таблицы по мере их добавления.
-      //    Токен от первого клиента (scoping принят как допустимый).
+      // 4. Подписка на изменения фрагмента — подгружаем НОВЫЕ таблицы по мере добавления
       function onContentChange(): void {
         const allIds = extractMwsTableDstIds(content);
         const newIds = allIds.filter((id) => !knownIds.has(id));
@@ -129,7 +127,7 @@ const server = Server.configure({
         console.log(`[mws] lazy load new tables  page=${pageId}  tables=[${newIds.join(", ")}]`);
         Promise.allSettled(
           newIds.map((dstId) =>
-            loadTable(dstId, token).catch((e) => {
+            loadTable(dstId, token).catch((e: unknown) => {
               console.error(`[mws] lazy load failed  dst=${dstId}:`, e);
               if (e instanceof MwsUnavailableError) {
                 document.broadcastStateless(
@@ -145,7 +143,7 @@ const server = Server.configure({
       docObservers.set(pageId, () => content.unobserveDeep(onContentChange));
 
       // 5. Регистрируем страницу в Redis (только при первом load)
-      await registerPage(pageId).catch((err) =>
+      await registerPage(pageId).catch((err: unknown) =>
         console.error(`[registry] register failed  page=${pageId}:`, err)
       );
     }
@@ -163,15 +161,12 @@ const server = Server.configure({
 
   // ── onChange ─────────────────────────────────────────────────────────────────
   // Обнаружение новых таблиц перенесено в observeDeep (content.observeDeep).
-  // onChange оставлен для отладочного логирования Y.js update-потока.
   async onChange({ documentName, clientsCount, context, update }: onChangePayload) {
     const socket = (context as ConnContext)?.socketId ?? "?";
     console.log(`[sync] onChange  page=${documentName}  from=${socket}  clients=${clientsCount}  bytes=${update.byteLength}`);
   },
 
   // ── onStateless ──────────────────────────────────────────────────────────────
-  // Кастомные JSON-сообщения: tbl_op, tbl_aw.
-  // Клиент шлёт через provider.sendStateless(JSON.stringify(msg)).
   async onStateless({ payload, document, connection, documentName }: onStatelessPayload) {
     const socket = (connection.context as ConnContext)?.socketId ?? "?";
     console.log(`[stateless] IN  page=${documentName}  from=${socket}  payload=${payload.slice(0, 120)}`);
@@ -200,7 +195,6 @@ const server = Server.configure({
         broadcast(msg);
         break;
       case "tbl_rollback":
-        // tbl_rollback — сервер-to-клиент сообщение; клиент не должен его слать
         console.warn(`[stateless] client sent tbl_rollback (server-only)  socket=${socket}`);
         break;
       default:
@@ -208,18 +202,11 @@ const server = Server.configure({
     }
   },
 
-  // onStoreDocument не используется: flush + retry делает docFlusher
-  // (периодический таймер каждые 3 мин + финальный flush при idle/destroy).
-
   extensions: [],
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/**
- * Рекурсивно ищет узлы mws_table в Y.XmlFragment / Y.XmlElement.
- * TipTap вставляет кастомные ноды через расширения — они попадают в XmlFragment.
- */
 function extractMwsTableDstIds(root: Y.XmlFragment): string[] {
   const ids = new Set<string>();
   root.toArray().forEach((child) => {
@@ -235,17 +222,20 @@ function extractMwsTableDstIds(root: Y.XmlFragment): string[] {
 
 // ── Graceful shutdown ─────────────────────────────────────────────────────────
 async function shutdown(signal: string): Promise<void> {
-  shuttingDown = true;  // onAuthenticate отклоняет новые соединения
+  shuttingDown = true;
   console.log(`[shutdown] ${signal} — flushing ${docs.size} docs…`);
 
   await Promise.allSettled(
     Array.from(docs.values()).map((h) =>
-      h.destroy().catch((err) => console.error("[shutdown] flush error:", err))
+      h.destroy().catch((err: unknown) => console.error("[shutdown] flush error:", err))
     )
   );
 
-  // Закрываем WS-сервер после flush (Y.Doc'и уже сохранены)
-  await server.destroy().catch((err) =>
+  await disconnectProducer().catch((err: unknown) =>
+    console.error("[shutdown] kafka disconnect error:", err)
+  );
+
+  await server.destroy().catch((err: unknown) =>
     console.error("[shutdown] server.destroy error:", err)
   );
 
@@ -258,8 +248,15 @@ process.on("unhandledRejection", (reason) => {
   console.error("[process] unhandledRejection:", reason);
 });
 
-server.listen().then(() => {
+async function init(): Promise<void> {
+  await ensureBucketLifecycle();
+  startOutboxPublisher();
+  startRoutingServer();
+  await server.listen();
   console.log(`[collab] hocuspocus listening on :${config.port}`);
-});
+}
 
-startRoutingServer();
+init().catch((err) => {
+  console.error("[collab] startup failed:", err);
+  process.exit(1);
+});
