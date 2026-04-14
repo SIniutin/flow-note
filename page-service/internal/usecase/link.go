@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 
+	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 
 	"go.uber.org/zap"
@@ -23,15 +25,15 @@ func (s *Service) ReplacePageLinks(ctx context.Context, pageID uuid.UUID, links 
 	return nil
 }
 
-func (s *Service) GetPageConnectedLinks(ctx context.Context, credentials *domain.UserCredentials, pageID uuid.UUID) ([]domain.Page, []domain.PageLink, error) {
-	if !hasRequiredPermission(credentials.Role, domain.RoleViewer) {
+func (s *Service) GetPageConnectedLinks(ctx context.Context, credentials *authctx.UserCredentials, pageID uuid.UUID) ([]domain.Page, []domain.PageLink, error) {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
 		s.logger.Warn("GetPageConnectedLinks permission denied",
 			zap.String("page_id", pageID.String()),
 			zap.String("user_id", credentials.UserId.String()),
 			zap.String("role", string(credentials.Role)),
-			zap.Error(domain.ErrViewerPermissionRequired),
+			zap.Error(perm.ErrViewerPermissionRequired),
 		)
-		return nil, nil, domain.ErrViewerPermissionRequired
+		return nil, nil, perm.ErrViewerPermissionRequired
 	}
 
 	pages, links, err := s.linkRepo.GetPageConnectedLinks(ctx, pageID)

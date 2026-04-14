@@ -2,46 +2,59 @@ package handler
 
 import (
 	pagesv1 "github.com/flow-note/api-contracts/generated/proto/page/v1"
+	"github.com/flow-note/common/perm"
 
 	"github.com/flow-note/page-service/internal/domain"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func permissionRoleFromProto(role pagesv1.PagePermissionRole) domain.PermissionRole {
+func permissionRoleFromProto(role pagesv1.PagePermissionRole) perm.PermissionRole {
 	switch role {
 	case pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_OWNER:
-		return domain.PermissionRole("owner")
+		return perm.RoleOwner
+	case pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_MENTOR:
+		return perm.RoleMentor
 	case pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_EDITOR:
-		return domain.PermissionRole("editor")
+		return perm.RoleEditor
+	case pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_COMMENTER:
+		return perm.RoleCommenter
+	case pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_VIEWER:
+		return perm.RoleViewer
 	default:
-		return domain.PermissionRole("viewer")
+		return perm.RoleUnspecified
 	}
 }
 
-func permissionRoleToProto(role domain.PermissionRole) pagesv1.PagePermissionRole {
+func permissionRoleToProto(role perm.PermissionRole) pagesv1.PagePermissionRole {
 	switch string(role) {
 	case "owner":
 		return pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_OWNER
+	case "mentor":
+		return pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_MENTOR
 	case "editor":
 		return pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_EDITOR
-	default:
+	case "commenter":
+		return pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_COMMENTER
+	case "viewer":
 		return pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_VIEWER
+	default:
+		return pagesv1.PagePermissionRole_PAGE_PERMISSION_ROLE_UNSPECIFIED
 	}
 }
 
 func mediaTypeFromProto(mediaType pagesv1.MediaType) domain.MediaType {
 	switch mediaType {
 	case pagesv1.MediaType_MEDIA_TYPE_IMAGE:
-		return domain.MediaType("IMAGE")
+		return domain.IMAGE
 	case pagesv1.MediaType_MEDIA_TYPE_VIDEO:
-		return domain.MediaType("VIDEO")
+		return domain.VIDEO
 	case pagesv1.MediaType_MEDIA_TYPE_FILE:
-		return domain.MediaType("FILE")
+		return domain.FILE
 	case pagesv1.MediaType_MEDIA_TYPE_AUDIO:
-		return domain.MediaType("AUDIO")
+		return domain.AUDIO
 	default:
-		return domain.MediaType("FILE")
+		return domain.FILE
 	}
 }
 

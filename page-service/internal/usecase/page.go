@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 
+	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -26,15 +28,15 @@ func (s *Service) CreatePage(ctx context.Context, ownerId uuid.UUID, title strin
 	return page, nil
 }
 
-func (s *Service) GetPage(ctx context.Context, credentials *domain.UserCredentials, pageID uuid.UUID) (*domain.Page, error) {
-	if !hasRequiredPermission(credentials.Role, domain.RoleViewer) {
+func (s *Service) GetPage(ctx context.Context, credentials *authctx.UserCredentials, pageID uuid.UUID) (*domain.Page, error) {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
 		s.logger.Warn("GetPage permission denied",
 			zap.String("page_id", pageID.String()),
 			zap.String("user_id", credentials.UserId.String()),
 			zap.String("role", string(credentials.Role)),
-			zap.Error(domain.ErrViewerPermissionRequired),
+			zap.Error(perm.ErrViewerPermissionRequired),
 		)
-		return nil, domain.ErrViewerPermissionRequired
+		return nil, perm.ErrViewerPermissionRequired
 	}
 
 	page, err := s.pageRepo.GetPage(ctx, pageID)
@@ -100,15 +102,15 @@ func (s *Service) UpdatePage(ctx context.Context, pageID uuid.UUID, title string
 	return page, nil
 }
 
-func (s *Service) DeletePage(ctx context.Context, credentials *domain.UserCredentials, pageID uuid.UUID) error {
-	if !hasRequiredPermission(credentials.Role, domain.RoleOwner) {
+func (s *Service) DeletePage(ctx context.Context, credentials *authctx.UserCredentials, pageID uuid.UUID) error {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleOwner) {
 		s.logger.Warn("DeletePage permission denied",
 			zap.String("page_id", pageID.String()),
 			zap.String("user_id", credentials.UserId.String()),
 			zap.String("role", string(credentials.Role)),
-			zap.Error(domain.ErrOwnerPermissionRequired),
+			zap.Error(perm.ErrOwnerPermissionRequired),
 		)
-		return domain.ErrOwnerPermissionRequired
+		return perm.ErrOwnerPermissionRequired
 	}
 
 	err := s.pageRepo.DeletePage(ctx, pageID)

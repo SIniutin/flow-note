@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 
+	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -23,15 +25,15 @@ func (s *Service) ReplacePageTables(ctx context.Context, pageID uuid.UUID, table
 	return nil
 }
 
-func (s *Service) ListPageTables(ctx context.Context, credentials *domain.UserCredentials, pageID uuid.UUID) ([]domain.Table, error) {
-	if !hasRequiredPermission(credentials.Role, domain.RoleViewer) {
+func (s *Service) ListPageTables(ctx context.Context, credentials *authctx.UserCredentials, pageID uuid.UUID) ([]domain.Table, error) {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
 		s.logger.Warn("ListPageTables permission denied",
 			zap.String("page_id", pageID.String()),
 			zap.String("user_id", credentials.UserId.String()),
 			zap.String("role", string(credentials.Role)),
-			zap.Error(domain.ErrViewerPermissionRequired),
+			zap.Error(perm.ErrViewerPermissionRequired),
 		)
-		return nil, domain.ErrViewerPermissionRequired
+		return nil, perm.ErrViewerPermissionRequired
 	}
 
 	tables, err := s.tableRepo.ListTablesByPageID(ctx, pageID)

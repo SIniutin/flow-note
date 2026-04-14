@@ -1,12 +1,22 @@
 package authctx
 
-import "context"
+import (
+	"context"
+
+	"github.com/flow-note/common/perm"
+	"github.com/google/uuid"
+)
 
 type key struct{}
 
 type AuthInfo struct {
 	UserID string
 	Role   string
+}
+
+type UserCredentials struct {
+	UserId uuid.UUID
+	Role   perm.PermissionRole
 }
 
 func WithAuthInfo(ctx context.Context, info AuthInfo) context.Context {
@@ -19,36 +29,60 @@ func AuthInfoFromContext(ctx context.Context) (AuthInfo, bool) {
 	return info, ok
 }
 
-func WithUserID(ctx context.Context, id string) context.Context {
-	info, _ := AuthInfoFromContext(ctx)
-	info.UserID = id
-	return WithAuthInfo(ctx, info)
+func ParseUserIDAndPermissionRole(ctx context.Context) (*UserCredentials, error) {
+	userId, err := ParseUserIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	userRole, err := ParseUserRoleFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &UserCredentials{
+		UserId: userId,
+		Role:   userRole,
+	}, nil
 }
 
-func UserID(ctx context.Context) (string, bool) {
-	info, ok := AuthInfoFromContext(ctx)
+func ParseUserIDFromCtx(ctx context.Context) (uuid.UUID, error) {
+	authInfo, ok := AuthInfoFromContext(ctx)
 	if !ok {
-		return "", false
+		return uuid.Nil, ErrMissingUserIDInContext
 	}
-	if info.UserID == "" {
-		return "", false
+	if authInfo.UserID == "" {
+		return uuid.Nil, ErrMissingUserIDInContext
 	}
-	return info.UserID, true
+
+	userID, err := uuid.Parse(authInfo.UserID)
+	if err != nil {
+		return uuid.Nil, ErrInvalidUserIDInContext
+	}
+
+	return userID, nil
 }
 
-func WithRole(ctx context.Context, role string) context.Context {
-	info, _ := AuthInfoFromContext(ctx)
-	info.Role = role
-	return WithAuthInfo(ctx, info)
-}
-
-func Role(ctx context.Context) (string, bool) {
-	info, ok := AuthInfoFromContext(ctx)
+func ParseUserRoleFromCtx(ctx context.Context) (perm.PermissionRole, error) {
+	authInfo, ok := AuthInfoFromContext(ctx)
 	if !ok {
-		return "", false
+		return "", ErrMissingUserRoleInContext
 	}
-	if info.Role == "" {
-		return "", false
+
+	role := perm.PermissionRole(authInfo.Role)
+	ok = isValidPermissionRole(role)
+	if !ok {
+		return "", ErrInvalidUserRoleInContext
 	}
-	return info.Role, true
+
+	return role, nil
+}
+
+func isValidPermissionRole(role perm.PermissionRole) bool {
+	switch role {
+	case "owner", "editor", "viewer", "mentor", "commenter":
+		return true
+	default:
+		return false
+	}
 }

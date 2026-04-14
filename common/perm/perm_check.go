@@ -1,8 +1,6 @@
-package usecase
+package perm
 
-import "github.com/flow-note/page-service/internal/domain"
-
-func permissionLevel(role domain.PermissionRole) int {
+func permissionLevel(role PermissionRole) int {
 	switch role {
 	case "viewer":
 		return 1
@@ -19,6 +17,6 @@ func permissionLevel(role domain.PermissionRole) int {
 	}
 }
 
-func hasRequiredPermission(actualRole, requiredRole domain.PermissionRole) bool {
+func HasRequiredPermission(actualRole, requiredRole PermissionRole) bool {
 	return permissionLevel(actualRole) >= permissionLevel(requiredRole)
 }

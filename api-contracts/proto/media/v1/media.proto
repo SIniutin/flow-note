@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package media.v1;
+
+option go_package = "github.com/flow-note/api-contracts/generated/proto/media/v1;mediav1";
+
+import "google/api/annotations.proto";
+import "buf/validate/validate.proto";
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Media Service
+// ───────────────────────────────────────────────────────────────────────────────
+
+service MediaService {
+
+  rpc GetLatestSnapshotDownloadUrl(GetLatestSnapshotDownloadUrlRequest)
+      returns (GetLatestSnapshotDownloadUrlResponse) {
+    option (google.api.http) = {
+      get: "/v1/media/snapshots/{page_id}/latest/download"
+    };
+  }
+
+  rpc GetSnapshotDownloadUrl(GetSnapshotDownloadUrlRequest)
+      returns (GetSnapshotDownloadUrlResponse) {
+    option (google.api.http) = {
+      get: "/v1/media/snapshots/{page_id}/{version_id}/download"
+    };
+  }
+
+  rpc GetMediaDownloadUrl(GetMediaDownloadUrlRequest)
+      returns (GetMediaDownloadUrlResponse) {
+    option (google.api.http) = {
+      get: "/v1/{page_id}/media/{media_id}/download"
+    };
+  }
+
+  rpc GetMediaUploadUrl(GetMediaUploadUrlRequest)
+      returns (GetMediaUploadUrlResponse) {
+    option (google.api.http) = {
+      post: "/v1/media/{page_id}/upload"
+      body: "*"
+    };
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Snapshot
+// ───────────────────────────────────────────────────────────────────────────────
+
+message GetLatestSnapshotDownloadUrlRequest {
+  string page_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message GetLatestSnapshotDownloadUrlResponse {
+  string download_url = 1;
+  int64 expires_at = 2;
+}
+
+message GetSnapshotDownloadUrlRequest {
+  string page_id = 1 [(buf.validate.field).string.uuid = true];
+  string version_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+message GetSnapshotDownloadUrlResponse {
+  string download_url = 1;
+  int64 expires_at = 2;
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Media Download
+// ───────────────────────────────────────────────────────────────────────────────
+
+message GetMediaDownloadUrlRequest {
+  string media_id = 1 [(buf.validate.field).string.uuid = true];
+  string page_id = 2 [(buf.validate.field).string.uuid = true];
+}
+
+message GetMediaDownloadUrlResponse {
+  string download_url = 1;
+  int64 expires_at = 2;
+}
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Media Upload
+// ───────────────────────────────────────────────────────────────────────────────
+
+message GetMediaUploadUrlRequest {
+  string page_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+message GetMediaUploadUrlResponse {
+  string upload_url = 1;
+  string media_id = 2;
+  int64 expires_at = 3;
+}

@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 
+	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
@@ -22,15 +24,15 @@ func (s *Service) ReplacePageMedia(ctx context.Context, pageID uuid.UUID, media 
 	return nil
 }
 
-func (s *Service) ListPageMedia(ctx context.Context, credentials *domain.UserCredentials, pageID uuid.UUID) ([]domain.Media, error) {
-	if !hasRequiredPermission(credentials.Role, domain.RoleViewer) {
+func (s *Service) ListPageMedia(ctx context.Context, credentials *authctx.UserCredentials, pageID uuid.UUID) ([]domain.Media, error) {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
 		s.logger.Warn("ListPageMedia permission denied",
 			zap.String("page_id", pageID.String()),
 			zap.String("user_id", credentials.UserId.String()),
 			zap.String("role", string(credentials.Role)),
-			zap.Error(domain.ErrPermissionDenied),
+			zap.Error(perm.ErrPermissionDenied),
 		)
-		return nil, domain.ErrPermissionDenied
+		return nil, perm.ErrPermissionDenied
 	}
 
 	media, err := s.mediaRepo.ListMediasByPageID(ctx, pageID)

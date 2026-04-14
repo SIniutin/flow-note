@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -269,7 +270,7 @@ func (r *Repository) getVersion(ctx context.Context, query string, args ...any) 
 
 // PermissionRepository
 
-func (r *Repository) CreatePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID, role domain.PermissionRole) (*domain.Permission, error) {
+func (r *Repository) CreatePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID, role perm.PermissionRole) (*domain.Permission, error) {
 	const query = `
 		INSERT INTO page_permissions (page_id, user_id, role, granted_by)
 		VALUES ($1, $2, $3, $2)
@@ -278,7 +279,7 @@ func (r *Repository) CreatePermission(ctx context.Context, pageID uuid.UUID, use
 	return r.scanPermissionRow(ctx, query, pageID, userID, string(role))
 }
 
-func (r *Repository) UpdateRolePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID, role domain.PermissionRole) (*domain.Permission, error) {
+func (r *Repository) UpdateRolePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID, role perm.PermissionRole) (*domain.Permission, error) {
 	const query = `
 		UPDATE page_permissions
 		SET role = $3
@@ -379,7 +380,7 @@ func scanPermission(row interface{ Scan(dest ...any) error }) (domain.Permission
 	); err != nil {
 		return domain.Permission{}, err
 	}
-	permission.Role = domain.PermissionRole(role)
+	permission.Role = perm.PermissionRole(role)
 	permission.GrantedBy = grantedBy
 	return permission, nil
 }

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 
+	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 
 	"github.com/flow-note/page-service/internal/domain"
@@ -25,8 +26,8 @@ type VersionRepository interface {
 }
 
 type PermissionRepository interface {
-	CreatePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID, role domain.PermissionRole) (*domain.Permission, error)
-	UpdateRolePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID, role domain.PermissionRole) (*domain.Permission, error)
+	CreatePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID, role perm.PermissionRole) (*domain.Permission, error)
+	UpdateRolePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID, role perm.PermissionRole) (*domain.Permission, error)
 	DeletePermission(ctx context.Context, pageID uuid.UUID, userID uuid.UUID) error
 	ListPermissionByPageID(ctx context.Context, pageID uuid.UUID) ([]domain.Permission, error)
 	GetByPageIDAndUserID(ctx context.Context, pageID uuid.UUID, userID uuid.UUID) (*domain.Permission, error)
