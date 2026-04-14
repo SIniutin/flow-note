@@ -43,9 +43,17 @@ test:
 	${GO_TEST} ${GO_TEST_ARGS}
 
 .install-protoc:
-	$(INSTALL_CMD)
+	@if command -v protoc >/dev/null 2>&1; then \
+		echo "protoc already installed, skipping."; \
+	elif [ -n "$(INSTALL_CMD)" ]; then \
+		$(INSTALL_CMD); \
+	else \
+		echo "No protoc installer configured for this platform."; \
+		exit 1; \
+	fi
 
 bin-deps: .bin-deps
+generate-bin-deps: .generate-bin-deps
 
 .bin-deps: export GOBIN := $(LOCAL_BIN)
 .bin-deps: .create-bin .install-protoc
@@ -60,11 +68,21 @@ bin-deps: .bin-deps
 	go install golang.org/x/tools/cmd/goimports@v0.19.0 && \
 	go install github.com/envoyproxy/protoc-gen-validate@v1.2.1
 
+.generate-bin-deps: export GOBIN := $(LOCAL_BIN)
+.generate-bin-deps: .create-bin .install-protoc
+	GOBIN=$(LOCAL_BIN) go install github.com/easyp-tech/easyp/cmd/easyp@latest && \
+	go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.18.1 && \
+	go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.18.1 && \
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.1 && \
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.2.0 && \
+	go install golang.org/x/tools/cmd/goimports@v0.19.0 && \
+	go install github.com/envoyproxy/protoc-gen-validate@v1.2.1
+
 .create-bin:
 	rm -rf ./bin
 	mkdir -p ./bin
 
-generate: bin-deps .generate
+generate: generate-bin-deps .generate
 fast-generate: .generate
 
 .generate:

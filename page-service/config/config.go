@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"strings"
 )
 
 type GRPCConfig struct {
@@ -28,9 +27,9 @@ func (c DBConfig) URL() string {
 }
 
 type JWTConfig struct {
-	Issuer    string
-	Audience  string
-	PublicKey []byte
+	Issuer        string
+	Audience      string
+	PublicKeyPath string
 }
 
 type Config struct {
@@ -92,10 +91,8 @@ func MustLoad() Config {
 	if value, ok := os.LookupEnv("JWT_AUDIENCE"); ok {
 		cfg.JWT.Audience = value
 	}
-	if value, ok := os.LookupEnv("JWT_PUBLIC_KEY"); ok {
-		cfg.JWT.PublicKey = []byte(value)
-		// TODO: delete
-		cfg.JWT.PublicKey = []byte(strings.ReplaceAll(string(cfg.JWT.PublicKey), "\\n", "\n"))
+	if value, ok := os.LookupEnv("JWT_PUBLIC_KEY_PEM"); ok {
+		cfg.JWT.PublicKeyPath = value
 	}
 
 	return cfg

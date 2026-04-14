@@ -17,6 +17,9 @@ const WS_BASE = `${window.location.protocol === "https:" ? "wss" : "ws"}://${win
 // ── Singleton state ───────────────────────────────────────────────────────────
 
 export let ydoc: Y.Doc = new Y.Doc();
+export let provider: HocuspocusProvider | null = null;
+export let awareness: HocuspocusProvider["awareness"] | null = null;
+export let providerEpoch = 0;
 
 function makeProvider(pageId: string, doc: Y.Doc): HocuspocusProvider {
     const p = new HocuspocusProvider({
@@ -35,8 +38,15 @@ function makeProvider(pageId: string, doc: Y.Doc): HocuspocusProvider {
     return p;
 }
 
-export let provider: HocuspocusProvider = makeProvider("page-default", ydoc);
-export let awareness = provider.awareness;
+function hasAccessToken(): boolean {
+    return Boolean(getAccessToken());
+}
+
+function setProvider(next: HocuspocusProvider | null): void {
+    provider = next;
+    awareness = next?.awareness ?? null;
+    providerEpoch += 1;
+}
 
 // ── Page switch ───────────────────────────────────────────────────────────────
 
@@ -46,12 +56,15 @@ export let awareness = provider.awareness;
  * иначе TipTap продолжит работать со старым ydoc.
  */
 export function connectCollab(pageId: string): void {
-    provider.destroy();
+    provider?.destroy();
     ydoc.destroy();
 
-    ydoc      = new Y.Doc();
-    provider  = makeProvider(pageId, ydoc);
-    awareness = provider.awareness;
+    ydoc = new Y.Doc();
+    if (!hasAccessToken()) {
+        setProvider(null);
+        return;
+    }
+    setProvider(makeProvider(pageId, ydoc));
 }
 
 /**
@@ -59,42 +72,12 @@ export function connectCollab(pageId: string): void {
  * Используется после обновления JWT-токена — редактор ремонтировать не нужно.
  */
 export function reconnectPageProvider(pageId: string): void {
-    provider.destroy();
-    provider  = makeProvider(pageId, ydoc);
-    awareness = provider.awareness;
+    provider?.destroy();
+    if (!hasAccessToken()) {
+        setProvider(null);
+        return;
+    }
+    setProvider(makeProvider(pageId, ydoc));
 }
 
 export const ROOM_NAME = "wiki-editor-v1"; // kept for backward compat
-
-// ── Workspace doc (shared pages list) ────────────────────────────────────────
-// Стабильный синглтон — никогда не переприсваивается, чтобы наблюдатели
-// в pagesStore оставались действительными.
-
-export const workspaceDoc: Y.Doc = new Y.Doc();
-let _workspaceProvider: HocuspocusProvider | null = null;
-
-/**
- * Подключить workspace-документ к серверу.
- * Вызывается один раз из App после монтирования (когда токен уже доступен).
- * onSynced — коллбэк после первоначальной синхронизации с сервером.
- */
-export function initWorkspaceProvider(onSynced: () => void): void {
-    _workspaceProvider?.destroy();
-    _workspaceProvider = new HocuspocusProvider({
-        url: WS_BASE,
-        name: "workspace",
-        document: workspaceDoc,
-        token: getAccessToken() ?? "",
-        onSynced: () => {
-            console.log("[collab] workspace synced");
-            onSynced();
-        },
-        onConnect:    () => console.log("[collab] workspace connected"),
-        onDisconnect: () => console.log("[collab] workspace disconnected"),
-        onAuthenticated: () => console.log("[collab] workspace authenticated"),
-        onAuthenticationFailed: ({ reason }: { reason: string }) =>
-            console.warn("[collab] workspace auth failed:", reason),
-        onClose: ({ event }: { event: CloseEvent }) =>
-            console.warn(`[collab] workspace ws closed  code=${event.code}`),
-    });
-}

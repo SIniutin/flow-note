@@ -1,22 +1,23 @@
 // ─── src/api/notifyClient.ts ──────────────────────────────────────────────────
-// HTTP клиент для NotifyService (gRPC-gateway, /api/v1/notifications)
+// HTTP клиент для NotifyService (gRPC-gateway, /api/v1/notifications).
+// Swagger: api-contracts/docs/spec/proto/notify/v1/notify.swagger.json
 
 import { getAccessToken } from "../data/authStore";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types (camelCase — соответствует swagger v1Notification) ──────────────────
 
 export interface Notification {
-    id: string;
-    user_id: string;
-    type: string;
-    actor_user_id?: string;
-    page_id?: string;
-    thread_id?: string;
-    comment_id?: string;
-    payload_json: string;
-    read: boolean;
-    created_at: string;
-    read_at?: string;
+    id:           string;
+    userId:       string;
+    type:         string;
+    actorUserId?: string;
+    pageId?:      string;
+    threadId?:    string;
+    commentId?:   string;
+    payloadJson:  string;
+    read:         boolean;
+    createdAt:    string;
+    readAt?:      string;
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -49,25 +50,25 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 // ── API ───────────────────────────────────────────────────────────────────────
 
 export const notifyClient = {
-    // GET /api/v1/notifications?unread_only=&only_mentions=&limit=&offset=
+    // GET /api/v1/notifications?unreadOnly=&onlyMentions=&limit=&offset=
     listNotifications(opts: {
-        unread_only?: boolean;
-        only_mentions?: boolean;
-        limit?: number;
-        offset?: number;
+        unreadOnly?:   boolean;
+        onlyMentions?: boolean;
+        limit?:        number;
+        offset?:       number;
     } = {}): Promise<{ items: Notification[] }> {
         const params = new URLSearchParams();
-        if (opts.unread_only    !== undefined) params.set("unread_only",    String(opts.unread_only));
-        if (opts.only_mentions  !== undefined) params.set("only_mentions",  String(opts.only_mentions));
-        if (opts.limit          !== undefined) params.set("limit",          String(opts.limit));
-        if (opts.offset         !== undefined) params.set("offset",         String(opts.offset));
+        if (opts.unreadOnly   !== undefined) params.set("unreadOnly",   String(opts.unreadOnly));
+        if (opts.onlyMentions !== undefined) params.set("onlyMentions", String(opts.onlyMentions));
+        if (opts.limit        !== undefined) params.set("limit",        String(opts.limit));
+        if (opts.offset       !== undefined) params.set("offset",       String(opts.offset));
         const qs = params.toString() ? `?${params}` : "";
         return request("GET", `/api/v1/notifications${qs}`);
     },
 
-    // POST /api/v1/notifications/{notification_id}:mark-read
+    // POST /api/v1/notifications/{notificationId}:mark-read
     markRead(notificationId: string): Promise<void> {
-        return request("POST", `/api/v1/notifications/${notificationId}:mark-read`, {});
+        return request("POST", `/api/v1/notifications/${encodeURIComponent(notificationId)}:mark-read`, {});
     },
 
     // POST /api/v1/notifications:mark-all-read

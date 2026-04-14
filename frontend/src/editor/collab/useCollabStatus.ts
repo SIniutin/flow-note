@@ -4,7 +4,7 @@
 // поэтому в каждом эффекте читаем provider.awareness, а не кэшируем.
 
 import { useEffect, useState } from "react";
-import { provider } from "./collabProvider";
+import { awareness, providerEpoch } from "./collabProvider";
 
 export interface CollabUser {
     clientId: number;
@@ -20,7 +20,8 @@ export interface CollabStatus {
 }
 
 function getStatus(): CollabStatus {
-    const aw     = provider.awareness;
+    const aw = awareness;
+    if (!aw) return { peers: [], totalClients: 0 };
     const states = aw.getStates();
     const myId   = aw.clientID;
 
@@ -41,11 +42,14 @@ export function useCollabStatus(): CollabStatus {
 
     useEffect(() => {
         const update = () => setStatus(getStatus());
-        const aw = provider.awareness;
+        const aw = awareness;
+        if (!aw) {
+            setStatus(getStatus());
+            return;
+        }
         aw.on("change", update);
         return () => { aw.off("change", update); };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [providerEpoch]);
 
     return status;
 }

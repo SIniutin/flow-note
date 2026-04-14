@@ -6,7 +6,7 @@ import type { NodeViewProps } from "@tiptap/react";
 import { tablesClient } from "../../api/tablesClient";
 import { BacklinksChip } from "./BacklinksChip";
 import type { MwsTable, MwsColumnType } from "../../types/mwsTable";
-import { provider } from "../collab/collabProvider";
+import { provider, providerEpoch } from "../collab/collabProvider";
 import "./mwsTableNodeView.css";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -109,6 +109,8 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
 
     useEffect(() => {
         if (!tableId) return;
+        const currentProvider = provider;
+        if (!currentProvider) return;
         const handler = ({ payload }: { payload: string }) => {
             try {
                 const msg = JSON.parse(payload) as { type?: string; dst_id?: string };
@@ -123,9 +125,9 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
                 }
             } catch { /* ignore invalid JSON */ }
         };
-        provider.on("stateless", handler);
-        return () => { provider.off("stateless", handler); };
-    }, [tableId]);
+        currentProvider.on("stateless", handler);
+        return () => { currentProvider.off("stateless", handler); };
+    }, [tableId, providerEpoch]);
 
     // ── закрытие меню режимов ─────────────────────────────────────────────────
 

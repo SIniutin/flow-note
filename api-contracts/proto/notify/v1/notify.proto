@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package notify.v1;
 
-option go_package = "github.com/flow-note/api-contracts/generated/notify/v1;notifyv1";
+option go_package = "github.com/flow-note/api-contracts/generated/proto/notify/v1;notifyv1";
 
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";

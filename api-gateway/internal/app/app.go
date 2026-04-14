@@ -5,11 +5,14 @@ import (
 	"net/http"
 	"strings"
 
-	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
-	collabpb "github.com/flow-note/api-contracts/generated/proto/collab/v1"
+	authpb    "github.com/flow-note/api-contracts/generated/proto/auth/v1"
+	collabpb  "github.com/flow-note/api-contracts/generated/proto/collab/v1"
 	commentpb "github.com/flow-note/api-contracts/generated/proto/comment/v1"
+	notifypb  "github.com/flow-note/api-contracts/generated/proto/notify/v1"
+	pagespb   "github.com/flow-note/api-contracts/generated/proto/page/v1"
 	"github.com/flow-note/api-gateway/internal/handlers"
 	"github.com/flow-note/api-gateway/internal/middleware"
+	p "github.com/flow-note/api-gateway/internal/policy"
 	"github.com/flow-note/common/authsecurity"
 	"github.com/flow-note/common/httpauth"
 	cr "github.com/flow-note/common/runtime"
@@ -19,6 +22,16 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 )
+
+// policies defines auth requirements per method+path.
+// {param} wildcards match a single path segment.
+// Unmatched routes default to AuthOnly.
+var policies = map[string]p.Policy{
+	"GET /healthz":           {Mode: p.Public},
+	"POST /v1/auth/login":    {Mode: p.Public},
+	"POST /v1/auth/register": {Mode: p.Public},
+	"POST /v1/auth/refresh":  {Mode: p.Public},
+}
 
 type App struct {
 	cfg Config
@@ -52,23 +65,38 @@ func (a *App) Run(ctx context.Context) error {
 	)
 
 	dialOpts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()), // OK for internal docker network; add mTLS for prod
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 
 	if err := authpb.RegisterAuthServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.AuthGRPCAddr, dialOpts); err != nil {
-		logger.Error("failed to setup auth service handler", zap.Error(err))
+		logger.Error("failed to register auth service", zap.Error(err))
 		return err
 	}
 	if err := collabpb.RegisterCollabTableServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.CollabGRPCAddr, dialOpts); err != nil {
-		logger.Error("failed to setup collab table service handler", zap.Error(err))
+		logger.Error("failed to register collab table service", zap.Error(err))
 		return err
 	}
 	if err := commentpb.RegisterCommentServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.CommentGRPCAddr, dialOpts); err != nil {
-		logger.Error("failed to setup comment service handler", zap.Error(err))
+		logger.Error("failed to register comment service", zap.Error(err))
+		return err
+	}
+	if err := pagespb.RegisterPagesServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.PagesGRPCAddr, dialOpts); err != nil {
+		logger.Error("failed to register pages service", zap.Error(err))
+		return err
+	}
+	if err := notifypb.RegisterNotifyServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.NotifyGRPCAddr, dialOpts); err != nil {
+		logger.Error("failed to register notify service", zap.Error(err))
 		return err
 	}
 
-	// ── Protected mux (requires valid JWT) ───────────────────────────────────
+	// ── Permission cache (Redis + page-service gRPC) ─────────────────────────
+	permCache, err := middleware.NewPagePermCache(a.cfg.RedisURL, a.cfg.PagesGRPCAddr, dialOpts, logger)
+	if err != nil {
+		logger.Error("failed to create permission cache", zap.Error(err))
+		return err
+	}
+
+	// ── Request mux ──────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
 	mux.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -76,25 +104,20 @@ func (a *App) Run(ctx context.Context) error {
 	}))
 	mux.Handle("/", grpcgw)
 
-	whitelist := map[string]struct{}{
-		"/healthz":          {},
-		"/v1/auth/login":    {},
-		"/v1/auth/register": {},
-		"/v1/auth/refresh":  {},
-	}
-	authMux := httpauth.AuthJWT(mux, verifier, whitelist)
+	// Chain: PolicyAuth → permCache → grpcgw
+	// PolicyAuth validates JWT and puts userID in ctx.
+	// permCache checks page-level permissions using Redis / page-service.
+	protectedMux := middleware.PolicyAuth(permCache.Middleware(mux), verifier, policies)
 
 	// ── Collab proxy (/collab/*) — JWT validation is done inside collab-service
-	// via onAuthenticate; the proxy is intentionally unauthenticated at this layer.
 	collabProxy := handlers.NewCollabProxy(a.cfg.CollabAddr, logger)
 
-	// ── Root dispatcher: collab bypasses JWT middleware, everything else goes through it
 	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/collab" || strings.HasPrefix(r.URL.Path, "/collab/") {
 			collabProxy.ServeHTTP(w, r)
 			return
 		}
-		authMux.ServeHTTP(w, r)
+		protectedMux.ServeHTTP(w, r)
 	})
 
 	var handler http.Handler = root
@@ -102,14 +125,16 @@ func (a *App) Run(ctx context.Context) error {
 	handler = middleware.RequestLog(logger)(handler)
 	handler = cr.RecoveryMiddleware(logger)(handler)
 
-	logger.Info(
-		"api-gateway listening",
-		zap.String("http_addr", a.cfg.HTTPAddr),
-		zap.String("auth_addr", a.cfg.AuthGRPCAddr),
-		zap.String("collab_grpc_addr", a.cfg.CollabGRPCAddr),
-		zap.String("comment_grpc_addr", a.cfg.CommentGRPCAddr),
-		zap.String("collab_addr", a.cfg.CollabAddr),
+	logger.Info("api-gateway listening",
+		zap.String("http_addr",      a.cfg.HTTPAddr),
+		zap.String("auth_grpc",      a.cfg.AuthGRPCAddr),
+		zap.String("pages_grpc",     a.cfg.PagesGRPCAddr),
+		zap.String("comment_grpc",   a.cfg.CommentGRPCAddr),
+		zap.String("notify_grpc",    a.cfg.NotifyGRPCAddr),
+		zap.String("collab_grpc",    a.cfg.CollabGRPCAddr),
+		zap.String("collab_ws",      a.cfg.CollabAddr),
 		zap.String("allowed_origin", a.cfg.AllowedOrigin),
+		zap.String("redis",          a.cfg.RedisURL),
 	)
 
 	return cr.ServeHTTP(ctx, a.cfg.HTTPAddr, handler)

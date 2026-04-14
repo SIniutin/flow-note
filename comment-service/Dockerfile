@@ -12,6 +12,7 @@ COPY comment-service/go.mod comment-service/go.sum ./
 RUN go mod download
 
 COPY comment-service/cmd        ./cmd
+COPY comment-service/db ./db
 COPY comment-service/internal   ./internal
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/comment-service ./cmd/comment-service

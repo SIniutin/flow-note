@@ -76,6 +76,33 @@ func (r *userRepoImpl) Create(ctx context.Context, u d.User, password d.Password
 	return nU, nil
 }
 
+func (r *userRepoImpl) GetByID(ctx context.Context, id d.UserID) (d.User, error) {
+	const q = `
+		SELECT id, email, login
+		FROM users
+		WHERE id = $1
+	`
+
+	var (
+		u        d.User
+		rawID    uuid.UUID
+		rawEmail string
+		rawLogin string
+	)
+	err := r.db.QueryRow(ctx, q, uuid.UUID(id)).Scan(&rawID, &rawEmail, &rawLogin)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return d.User{}, d.ErrNotFound
+		}
+		return d.User{}, fmt.Errorf("get user by id: %w", err)
+	}
+
+	u.ID = d.UserID(rawID)
+	u.Email = d.Email(rawEmail)
+	u.Login = d.Login(rawLogin)
+	return u, nil
+}
+
 func (r *userRepoImpl) GetByEmail(ctx context.Context, email d.Email) (d.User, error) {
 	const q = `
 		SELECT id, email, login

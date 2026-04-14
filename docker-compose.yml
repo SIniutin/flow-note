@@ -77,30 +77,30 @@ services:
       start_period: 30s
 
   # ── Mock Pages gRPC service ──────────────────────────────────────────────────
-  mock-pages:
-    image: node:20-alpine
-    working_dir: /app
-    command: node mock-pages/server.js
-    volumes:
-      - ./collab-service:/app
-    expose:
-      - "50051"
-    environment:
-      MOCK_PAGES_PORT: "50051"
-    restart: unless-stopped
-    healthcheck:
-      test:
-        - "CMD-SHELL"
-        - |
-          node -e "
-            var n=require('net').createConnection(50051,'localhost');
-            n.on('connect',function(){process.exit(0)});
-            n.on('error',function(){process.exit(1)});
-          "
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 10s
+  # mock-pages:
+  #   image: node:20-alpine
+  #   working_dir: /app
+  #   command: node mock-pages/server.js
+  #   volumes:
+  #     - ./collab-service:/app
+  #   expose:
+  #     - "50051"
+  #   environment:
+  #     MOCK_PAGES_PORT: "50051"
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test:
+  #       - "CMD-SHELL"
+  #       - |
+  #         node -e "
+  #           var n=require('net').createConnection(50051,'localhost');
+  #           n.on('connect',function(){process.exit(0)});
+  #           n.on('error',function(){process.exit(1)});
+  #         "
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 10
+  #     start_period: 10s
 
   # ── Mock Tables HTTP service ──────────────────────────────────────────────────
   mock-tables:
@@ -167,14 +167,14 @@ services:
         - "CMD-SHELL"
         - |
           node -e "
-            require('http').get('http://localhost:4001/health', function(r){
+            require('http').get('http://127.0.0.1:4001/health', function(r){
               process.exit(r.statusCode === 200 ? 0 : 1);
             }).on('error', function(){ process.exit(1); });
           "
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 40s
 
   # ── PostgreSQL (auth-service) ────────────────────────────────────────────────
   postgres:
@@ -272,13 +272,13 @@ services:
   page-service:
     build:
       context: .
-      dockerfile: pages_service/Dockerfile
+      dockerfile: page-service/Dockerfile
     restart: unless-stopped
     expose:
-      - "50051"
+      - "50055"
       - "8080"
     environment:
-      GRPC_PORT: "50051"
+      GRPC_PORT: "50055"
       HTTP_PORT: "8080"
       DB_HOST: "postgres-pages"
       DB_PORT: "5432"
@@ -286,18 +286,11 @@ services:
       DB_PASSWORD: "postgres"
       DB_NAME: "pages"
       DB_SSLMODE: "disable"
-      JWT_PUBLIC_KEY: |
-        -----BEGIN PUBLIC KEY-----
-        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvZQPaK71ljRwv8ZfZkJn
-        7PoQAesa3c1SrwNaioUYRTSPrpcwvmyPtx6IbfTIARsEXjNTnkgbYQ9+3tqZyrZN
-        D1R+cJQkL8aDEkdgXHAgh/6bg2M1jV8qcbIBTFGXiMI/CmJGHbkBhz8arm1Wmj8C
-        g2dY0uhafN2rFGlGe90Bi3wXY463lKikF/an8fUnszqaB5y0dtZwkDZhMa7x/oU1
-        LbN06I9IY+f9jAH4GePkPyR+X0P80LSvBT62bVNan1e+dfceFrn04B8p8aWLPsN8
-        DtCrOJAHlTzXNmB4CgzgnqsIOG0cdJCzv8CC7QN2OkRunIFqBV7ljaH7AjY1HuEv
-        UQIDAQAB
-        -----END PUBLIC KEY-----
+      JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
       JWT_ISSUER: "flow-note-auth"
       JWT_AUDIENCE: "flow-note-api"
+    secrets:
+      - jwt_public_key
     depends_on:
       postgres-pages:
         condition: service_healthy
@@ -360,7 +353,7 @@ services:
       S3_BUCKET: "snapshots"
       S3_ACCESS_KEY: "minioadmin"
       S3_SECRET_KEY: "minioadmin"
-      PAGES_GRPC_ADDR: "page-service:50051"
+      PAGES_GRPC_ADDR: "page-service:50055"
       WORKER_CONCURRENCY: "4"
     depends_on:
       kafka:
@@ -370,7 +363,7 @@ services:
       page-service:
         condition: service_started
 
-  # ── API Gateway (nginx) ──────────────────────────────────────────────────────
+  # ── API Gateway ──────────────────────────────────────────────────────────────
   api-gateway:
     build:
       context: .
@@ -379,19 +372,30 @@ services:
     ports:
       - "80:8080"
     environment:
-      GATEWAY_ADDR: ":8080"
-      AUTH_GRPC_ADDR: "auth-service:50052"
-      COLLAB_GRPC_ADDR: "collab-service:50053"
+      GATEWAY_ADDR:      ":8080"
+      AUTH_GRPC_ADDR:    "auth-service:50052"
+      PAGES_GRPC_ADDR:   "page-service:50055"
       COMMENT_GRPC_ADDR: "comment-service:9091"
-      COLLAB_ADDR: "collab-service:4000"
+      NOTIFY_GRPC_ADDR:  "notify-service:9092"
+      COLLAB_GRPC_ADDR:  "collab-service:50053"
+      COLLAB_ADDR:       "collab-service:4000"
       JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
-      JWT_ISSUER: "flow-note-auth"
-      JWT_AUDIENCE: "flow-note-api"
+      JWT_ISSUER:    "flow-note-auth"
+      JWT_AUDIENCE:  "flow-note-api"
       ALLOWED_ORIGIN: ""
+      REDIS_URL: "redis://redis:6379"
     secrets:
       - jwt_public_key
     depends_on:
+      redis:
+        condition: service_healthy
       auth-service:
+        condition: service_started
+      page-service:
+        condition: service_started
+      comment-service:
+        condition: service_started
+      notify-service:
         condition: service_started
       collab-service:
         condition: service_healthy
@@ -409,6 +413,12 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+
+secrets:
+  jwt_private_key:
+    file: ./secrets/jwt_private_key.pem
+  jwt_public_key:
+    file: ./secrets/jwt_public_key.pem
 
 volumes:
   postgres-data:

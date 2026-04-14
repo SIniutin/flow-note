@@ -18,6 +18,20 @@ export interface AuthResponse {
     tokens: TokenPair;
 }
 
+async function get<T>(path: string, accessToken?: string): Promise<T> {
+    const headers: Record<string, string> = {};
+    if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+
+    const res = await fetch(path, { method: "GET", headers });
+    if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let message = text;
+        try { message = JSON.parse(text).message ?? text; } catch { /* raw text */ }
+        throw new Error(message || `HTTP ${res.status}`);
+    }
+    return res.json();
+}
+
 async function post<T>(path: string, body: unknown, accessToken?: string): Promise<T> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
@@ -44,11 +58,19 @@ export const authClient = {
         return post("/v1/auth/login", { ...identifier, password });
     },
 
-    refresh(refresh_token: string): Promise<TokenPair> {
-        return post("/v1/auth/refresh", { refresh_token });
+    refresh(refreshToken: string): Promise<TokenPair> {
+        return post("/v1/auth/refresh", { refreshToken });
     },
 
-    logout(refresh_token: string, access_token: string): Promise<void> {
-        return post("/v1/auth/logout", { refresh_token }, access_token);
+    logout(refreshToken: string, access_token: string): Promise<void> {
+        return post("/v1/auth/logout", { refreshToken }, access_token);
+    },
+
+    getById(id: string, access_token?: string): Promise<{ user: AuthUser }> {
+        return get(`/v1/users/${encodeURIComponent(id)}`, access_token);
+    },
+
+    getByName(login: string, access_token?: string): Promise<{ user: AuthUser }> {
+        return get(`/v1/users/by-name/${encodeURIComponent(login)}`, access_token);
     },
 };

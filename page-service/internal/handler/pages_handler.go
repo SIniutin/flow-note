@@ -85,7 +85,7 @@ func (h *pagesHandler) GetPage(ctx context.Context, req *pagesv1.GetPageRequest)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("GetPage", startedAt, err, zap.String("page_id", req.GetPageId()))
 		return nil, err
@@ -125,7 +125,7 @@ func (h *pagesHandler) DeletePage(ctx context.Context, req *pagesv1.DeletePageRe
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("DeletePage", startedAt, err, zap.String("page_id", req.GetPageId()))
 		return nil, err
@@ -193,7 +193,7 @@ func (h *pagesHandler) GetCurrentVersion(ctx context.Context, req *pagesv1.GetCu
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("GetCurrentVersion", startedAt, err, zap.String("page_id", req.GetPageId()), zap.Int64("version_id", req.GetVersionId()))
 		return nil, err
@@ -216,7 +216,7 @@ func (h *pagesHandler) GetLastVersion(ctx context.Context, req *pagesv1.GetLastV
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("GetLastVersion", startedAt, err, zap.String("page_id", req.GetPageId()))
 		return nil, err
@@ -239,7 +239,7 @@ func (h *pagesHandler) ListVersions(ctx context.Context, req *pagesv1.ListVersio
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("ListVersions", startedAt, err, zap.String("page_id", req.GetPageId()), zap.Int32("limit", req.GetPagination().GetLimit()), zap.Int32("offset", req.GetPagination().GetOffset()))
 		return nil, err
@@ -262,7 +262,7 @@ func (h *pagesHandler) GrantPagePermission(ctx context.Context, req *pagesv1.Gra
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("GrantPagePermission", startedAt, err, zap.String("page_id", req.GetPageId()), zap.String("user_id", req.GetUserId()), zap.String("role", req.GetRole().String()))
 		return nil, err
@@ -291,7 +291,7 @@ func (h *pagesHandler) RevokePagePermission(ctx context.Context, req *pagesv1.Re
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("RevokePagePermission", startedAt, err, zap.String("page_id", req.GetPageId()), zap.String("user_id", req.GetUserId()))
 		return nil, err
@@ -313,7 +313,7 @@ func (h *pagesHandler) ListPagePermissions(ctx context.Context, req *pagesv1.Lis
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("ListPagePermissions", startedAt, err, zap.String("page_id", req.GetPageId()))
 		return nil, err
@@ -384,7 +384,7 @@ func (h *pagesHandler) GetPageConnected(ctx context.Context, req *pagesv1.GetPag
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("GetPageConnected", startedAt, err, zap.String("page_id", req.GetPageId()))
 		return nil, err
@@ -435,7 +435,7 @@ func (h *pagesHandler) ListPageMentions(ctx context.Context, req *pagesv1.ListPa
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("ListPageMentions", startedAt, err, zap.String("page_id", req.GetPageId()))
 		return nil, err
@@ -483,7 +483,7 @@ func (h *pagesHandler) ListPageTables(ctx context.Context, req *pagesv1.ListPage
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("ListPageTables", startedAt, err, zap.String("page_id", req.GetPageId()))
 		return nil, err
@@ -531,7 +531,7 @@ func (h *pagesHandler) ListPageMedia(ctx context.Context, req *pagesv1.ListPageM
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	userCredential, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	userCredential, err := h.resolvePageCredentials(ctx, mustParseUUID(req.GetPageId()))
 	if err != nil {
 		h.logWarn("ListPageMedia", startedAt, err, zap.String("page_id", req.GetPageId()))
 		return nil, err

@@ -64,8 +64,10 @@ func (a *App) Run(ctx context.Context) error {
 	logUser := usecase.NewLoginUser(sessionRepo, userRepo, issuer)
 	refreshUC := usecase.NewRefreshUser(sessionRepo, issuer)
 	logoutUC := usecase.NewLogoutUser(sessionRepo)
+	getByIDUC := usecase.NewGetUserById(userRepo)
+	getByNameUC := usecase.NewGetUserByName(userRepo)
 
-	handler := handlergrpc.NewServer(regUser, logUser, refreshUC, logoutUC)
+	handler := handlergrpc.NewServer(regUser, logUser, refreshUC, logoutUC, getByIDUC, getByNameUC)
 
 	srv := grpc.NewServer(grpc.UnaryInterceptor(recoveryUnaryServerInterceptor(logger)))
 	authpb.RegisterAuthServiceServer(srv, handler)

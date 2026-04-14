@@ -20,22 +20,24 @@ function authHeaders(): Record<string, string> {
 
 // ── Proto-mapped response types ───────────────────────────────────────────────
 
+// swagger: v1TableRow { recordId, cells }
+// swagger: v1GetTableResponse { dstId, viewId, rows[] }
 interface CollabTableRow {
-    record_id: string;
+    recordId: string;
     cells: Record<string, unknown>;
 }
 
 interface GetTableResponse {
-    dst_id:  string;
-    view_id: string;
-    rows:    CollabTableRow[];
+    dstId:  string;
+    viewId: string;
+    rows:   CollabTableRow[];
 }
 
 // ── Row mapping ───────────────────────────────────────────────────────────────
 
 function collabRowsToMws(rows: CollabTableRow[]): MwsRow[] {
     return rows.map(r => ({
-        id:    r.record_id,
+        id:    r.recordId,
         cells: r.cells as Record<string, string | number | boolean | null>,
     }));
 }

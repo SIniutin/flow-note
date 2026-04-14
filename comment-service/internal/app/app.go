@@ -5,6 +5,7 @@ import (
 	"net"
 
 	commentv1 "github.com/flow-note/api-contracts/generated/proto/comment/v1"
+	"github.com/flow-note/comment-service/db"
 	"github.com/flow-note/comment-service/internal/config"
 	grpcHandler "github.com/flow-note/comment-service/internal/handler/grpc"
 	"github.com/flow-note/comment-service/internal/repository"
@@ -29,25 +30,26 @@ func New(cfg config.Config) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := commonpg.New(context.Background(), cfg.PostgresDSN)
+	dbPool, err := commonpg.New(context.Background(), cfg.PostgresDSN)
 	if err != nil {
 		return nil, err
 	}
 	lis, err := net.Listen("tcp", ":"+cfg.GRPCPort)
 	if err != nil {
-		db.Close()
+		dbPool.Close()
 		return nil, err
 	}
+	db.SetupPostgres(dbPool.Pool, logger)
 
-	commentsRepo := repository.NewPostgres(db)
-	commentsService := commentservice.New(db, commentsRepo, commentsRepo)
+	commentsRepo := repository.NewPostgres(dbPool)
+	commentsService := commentservice.New(dbPool, commentsRepo, commentsRepo)
 	srv := grpc.NewServer()
 	commentv1.RegisterCommentServiceServer(srv, grpcHandler.New(commentsService))
 	reflection.Register(srv)
 	return &App{
 		Config:   cfg,
 		Logger:   logger,
-		db:       db,
+		db:       dbPool,
 		server:   srv,
 		listener: lis,
 	}, nil

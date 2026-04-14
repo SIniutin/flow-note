@@ -9,6 +9,7 @@ import { verifyToken } from "../auth/jwtVerifier";
 
 const PROTO_PATH = path.resolve(__dirname, "../../../api-contracts/proto/collab/v1/collab.proto");
 const API_CONTRACTS_ROOT = path.resolve(__dirname, "../../../api-contracts");
+const API_CONTRACTS_PROTO_ROOT = path.join(API_CONTRACTS_ROOT, "proto");
 
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   keepCase: true,
@@ -16,7 +17,9 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
   enums: String,
   defaults: true,
   oneofs: true,
-  includeDirs: fs.existsSync(API_CONTRACTS_ROOT) ? [API_CONTRACTS_ROOT] : undefined,
+  includeDirs: fs.existsSync(API_CONTRACTS_ROOT)
+    ? [API_CONTRACTS_ROOT, API_CONTRACTS_PROTO_ROOT]
+    : undefined,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

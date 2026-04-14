@@ -7,7 +7,9 @@ option go_package = "github.com/flow-note/api-contracts/generated/proto/auth/v1;
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
 
+//
 message User {
     string id = 1;
     string email = 2;
@@ -16,39 +18,69 @@ message User {
     google.protobuf.Timestamp updated_at = 5;
 }
 
+//
 message RegisterRequest {
-    string email = 1;
-    string login = 2;
-    string password = 3;
+    string email = 1 [(validate.rules).string.email = true];
+    string login = 2 [(validate.rules).string = {min_len: 1, max_len: 255}];
+    string password = 3 [(validate.rules).string.min_len = 1];
 }
 
+//
 message LoginRequest {
     oneof identifier {
-      string email = 1;
-      string login = 2;
+      string email = 1 [(validate.rules).string.email = true];
+      string login = 2 [(validate.rules).string = {min_len: 1, max_len: 255}];
     }
-    string password = 3;
+    string password = 3 [(validate.rules).string.min_len = 1];
 }
 
+//
 message TokenPair {
     string access_token = 1;
     string refresh_token = 2;
 }
 
+//
 message AuthResponse {
     User user = 1;
     TokenPair tokens = 2;
 }
 
+//
 message RefreshRequest {
-  string refresh_token = 1;
+  string refresh_token = 1 [(validate.rules).string.min_len = 1];
 }
 
+//
 message LogoutRequest {
-  string refresh_token = 1;
+  string refresh_token = 1 [(validate.rules).string.min_len = 1];
 }
 
+
+//
+message GetByIdRequest {
+  string id = 1 [(validate.rules).string.uuid = true];
+}
+
+//
+message GetByIdResponse {
+  User user = 1;
+}
+
+//
+message GetByNameRequest {
+  string login = 1 [(validate.rules).string = {min_len: 1, max_len: 255}];
+}
+
+//
+message GetByNameResponse {
+  User user = 1;
+}
+
+//
 service AuthService {
+
+  //
   rpc Register(RegisterRequest) returns (AuthResponse) {
     option (google.api.http) = {
       post: "/v1/auth/register"
@@ -56,6 +88,7 @@ service AuthService {
     };
   }
 
+  //
   rpc Login(LoginRequest) returns (AuthResponse) {
     option (google.api.http) = {
       post: "/v1/auth/login"
@@ -63,6 +96,7 @@ service AuthService {
     };
   }
 
+  //
   rpc Refresh(RefreshRequest) returns (TokenPair) {
     option (google.api.http) = {
       post: "/v1/auth/refresh"
@@ -70,10 +104,25 @@ service AuthService {
     };
   }
 
+  //
   rpc Logout(LogoutRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       post: "/v1/auth/logout"
       body: "*"
+    };
+  }
+
+  //
+  rpc GetById(GetByIdRequest) returns (GetByIdResponse) {
+    option (google.api.http) = {
+      get: "/v1/users/{id}"
+    };
+  }
+
+  //
+  rpc GetByName(GetByNameRequest) returns (GetByNameResponse) {
+    option (google.api.http) = {
+      get: "/v1/users/by-name/{login}"
     };
   }
 }

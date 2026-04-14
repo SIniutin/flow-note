@@ -26,7 +26,7 @@ import { MwsTableExtension } from "./mwsTable/MwsTableExtension";
 
 import * as collabProvider from "./collab/collabProvider";
 import "./collab/collab.css";
-import type { User } from "../data/users";
+import type { EditorUser } from "../data/useCurrentUser";
 
 export const AVATAR_COLORS: Record<1|2|3|4, string> = {
     1: "#6ad0d6",
@@ -81,9 +81,9 @@ const KeyboardShortcuts = Extension.create({
     },
 });
 
-export function createEditorExtensions(currentUser: User) {
+export function createEditorExtensions(currentUser: EditorUser) {
     // awareness берём из live binding — актуально после connectCollab()
-    collabProvider.awareness.setLocalStateField("user", {
+    collabProvider.awareness?.setLocalStateField("user", {
         name:  currentUser.name,
         color: AVATAR_COLORS[currentUser.colorIndex],
     });

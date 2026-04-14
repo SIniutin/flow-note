@@ -9,6 +9,7 @@ var ErrRepoIsFull = errors.New("repository is full")
 
 type UserRepo interface {
 	Create(ctx context.Context, u User, password PasswordHash) (User, error)
+	GetByID(ctx context.Context, id UserID) (User, error)
 	GetByEmail(ctx context.Context, email Email) (User, error)
 	GetByLogin(ctx context.Context, login Login) (User, error)
 	GetCredentials(ctx context.Context, id UserID) (Credentials, error)

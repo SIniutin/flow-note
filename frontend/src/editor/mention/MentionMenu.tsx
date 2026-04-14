@@ -1,26 +1,25 @@
 import { Popover } from "../../components/ui/Popover";
-import { fetchUsers } from "../../data/users";
+import { pageUsersStore, type PageUser } from "../../data/pageUsersStore";
 import { useMentionState, mentionStore } from "./mentionStore";
-import { Avatar } from "../../components/ui/layout";
 import "./mentionMenu.css";
 
 export function MentionMenu() {
     const { open, query, clientRect, editor, range, selectedIndex } = useMentionState();
-    const items = fetchUsers(query);
+    const items = pageUsersStore.filter(query);
+    const loading = pageUsersStore.isLoading();
 
     const anchor = clientRect
         ? { getBoundingClientRect: () => clientRect() ?? new DOMRect() }
         : null;
 
-    const pick = (i: number) => {
-        const user = items[i];
-        if (user && editor && range) {
+    const pick = (user: PageUser) => {
+        if (editor && range) {
             editor
                 .chain()
                 .focus()
                 .deleteRange(range)
                 .insertContent([
-                    { type: "mention", attrs: { userId: user.id } },
+                    { type: "mention", attrs: { id: user.id, label: user.login, kind: "user" } },
                     { type: "text", text: " " },
                 ])
                 .run();
@@ -29,19 +28,23 @@ export function MentionMenu() {
     };
 
     return (
-        <Popover open={open && items.length > 0} onClose={() => mentionStore.reset()} anchor={anchor}>
+        <Popover open={open && (items.length > 0 || loading)} onClose={() => mentionStore.reset()} anchor={anchor}>
             <ul className="mention-menu">
+                {loading && (
+                    <li className="mention-menu__item" style={{color:"var(--text-tertiary)",fontSize:"var(--fs-xs)"}}>
+                        Загрузка…
+                    </li>
+                )}
                 {items.map((user, i) => (
                     <li
                         key={user.id}
                         className={`mention-menu__item${i === selectedIndex ? " is-active" : ""}`}
-                        onMouseDown={(e) => { e.preventDefault(); pick(i); }}
+                        onMouseDown={(e) => { e.preventDefault(); pick(user); }}
                         onMouseEnter={() => mentionStore.set({ selectedIndex: i })}
                     >
-                        <Avatar name={user.name} colorIndex={user.colorIndex} size={28} />
                         <span className="mention-menu__text">
-                            <span className="mention-menu__name">{user.name}</span>
-                            {user.role && <span className="mention-menu__role">{user.role}</span>}
+                            <span className="mention-menu__name">{user.login}</span>
+                            <span className="mention-menu__role">{user.email}</span>
                         </span>
                     </li>
                 ))}

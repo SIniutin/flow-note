@@ -4,7 +4,7 @@ import { Extension } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
 import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
 import { mentionStore } from "./mentionStore";
-import { fetchUsers } from "../../data/users";
+import { pageUsersStore } from "../../data/pageUsersStore";
 
 export const MentionExtension = Extension.create({
     name: "mentionSuggestion",
@@ -14,14 +14,13 @@ export const MentionExtension = Extension.create({
                 char: "@",
                 startOfLine: false,
                 command: ({ editor, range, props }) => {
-                    const user = props as { id: string; name: string };
+                    const user = props as { id: string; login: string };
                     editor
                         .chain()
                         .focus()
                         .deleteRange(range)
                         .insertContent([
-                            // Новые attrs по схеме: id, label, kind
-                            { type: "mention", attrs: { id: user.id, label: user.name, kind: "user" } },
+                            { type: "mention", attrs: { id: user.id, label: user.login, kind: "user" } },
                             { type: "text", text: " " },
                         ])
                         .run();
@@ -35,7 +34,7 @@ export const MentionExtension = Extension.create({
                 pluginKey: new PluginKey("mentionSuggestion"),
                 editor: this.editor,
                 ...this.options.suggestion,
-                items: ({ query }) => fetchUsers(query),
+                items: ({ query }) => pageUsersStore.filter(query),
                 render: () => ({
                     onStart: (props) => {
                         mentionStore.set({
@@ -51,7 +50,7 @@ export const MentionExtension = Extension.create({
                     },
                     onKeyDown: (props) => {
                         const s = mentionStore.get();
-                        const items = fetchUsers(s.query);
+                        const items = pageUsersStore.filter(s.query);
                         if (props.event.key === "ArrowDown") {
                             mentionStore.set({ selectedIndex: (s.selectedIndex + 1) % Math.max(items.length, 1) });
                             return true;
@@ -68,7 +67,7 @@ export const MentionExtension = Extension.create({
                                     .focus()
                                     .deleteRange(s.range)
                                     .insertContent([
-                                        { type: "mention", attrs: { id: item.id, label: item.name, kind: "user" } },
+                                        { type: "mention", attrs: { id: item.id, label: item.login, kind: "user" } },
                                         { type: "text", text: " " },
                                     ])
                                     .run();

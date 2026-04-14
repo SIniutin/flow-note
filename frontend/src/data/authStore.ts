@@ -5,21 +5,31 @@ import { authClient, type AuthUser, type TokenPair } from "../api/authClient";
 
 const LS_ACCESS  = "auth:access_token";
 const LS_REFRESH = "auth:refresh_token";
+const LS_USER    = "auth:user";
 
 // ── in-memory state ───────────────────────────────────────────────────────────
 
 let _accessToken:  string | null = localStorage.getItem(LS_ACCESS);
 let _refreshToken: string | null = localStorage.getItem(LS_REFRESH);
-let _user:         AuthUser | null = null;
+let _user:         AuthUser | null = (() => {
+    try {
+        const raw = localStorage.getItem(LS_USER);
+        return raw ? (JSON.parse(raw) as AuthUser) : null;
+    } catch { return null; }
+})();
 
 const listeners = new Set<() => void>();
 function notify() { listeners.forEach(l => l()); }
 
-function persist(tokens: TokenPair) {
+function persist(tokens: TokenPair, user?: AuthUser) {
     _accessToken  = tokens.accessToken;
     _refreshToken = tokens.refreshToken;
     localStorage.setItem(LS_ACCESS,  tokens.accessToken);
     localStorage.setItem(LS_REFRESH, tokens.refreshToken);
+    if (user) {
+        _user = user;
+        localStorage.setItem(LS_USER, JSON.stringify(user));
+    }
 }
 
 function wipe() {
@@ -29,6 +39,7 @@ function wipe() {
     clearRefreshTimer();
     localStorage.removeItem(LS_ACCESS);
     localStorage.removeItem(LS_REFRESH);
+    localStorage.removeItem(LS_USER);
 }
 
 // ── Auto token refresh ────────────────────────────────────────────────────────
@@ -97,8 +108,7 @@ export async function login(
     password: string,
 ) {
     const res = await authClient.login(identifier, password);
-    _user = res.user;
-    persist(res.tokens);
+    persist(res.tokens, res.user);
     scheduleTokenRefresh();
     notify();
     return res;
@@ -106,8 +116,7 @@ export async function login(
 
 export async function register(email: string, login: string, password: string) {
     const res = await authClient.register(email, login, password);
-    _user = res.user;
-    persist(res.tokens);
+    persist(res.tokens, res.user);
     scheduleTokenRefresh();
     notify();
     return res;

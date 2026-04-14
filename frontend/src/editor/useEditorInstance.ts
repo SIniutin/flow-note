@@ -5,9 +5,9 @@ import {useEditor} from "@tiptap/react";
 import {createEditorExtensions, initialContent} from "./extensions";
 import {loadDoc} from "./persistence/storage";
 import * as collabProvider from "./collab/collabProvider";
-import type {User} from "../data/users";
+import type {EditorUser} from "../data/useCurrentUser";
 
-export function useEditorInstance(currentUser: User, pageId?: string) {
+export function useEditorInstance(currentUser: EditorUser, pageId?: string) {
     // createEditorExtensions читает ydoc / awareness через live binding —
     // при смене страницы (connectCollab + key={pageId}) получает свежий ydoc.
     const extensions = useMemo(

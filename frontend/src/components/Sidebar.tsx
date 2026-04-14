@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { usePages, pagesStore, type WikiPage } from "../data/pagesStore";
+import { useAuth } from "../data/authStore";
 import "./sidebar.css";
 
 // ── SVG icons ─────────────────────────────────────────────────────────────────
@@ -69,9 +70,11 @@ interface SidebarProps {
 
 export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: SidebarProps) {
     const pages = usePages();
+    const { user } = useAuth();
     const [search, setSearch] = useState("");
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState("");
+    const [createError, setCreateError] = useState<string | null>(null);
     const editRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -82,11 +85,16 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
         ? pages.filter(p => p.title.toLowerCase().includes(search.toLowerCase()))
         : pages;
 
-    function handleCreate() {
-        const page = pagesStore.create("Новая страница");
-        onNavigate(page.id);
-        setEditingId(page.id);
-        setEditTitle(page.title);
+    async function handleCreate() {
+        setCreateError(null);
+        try {
+            const page = await pagesStore.create("Новая страница");
+            onNavigate(page.id);
+            setEditingId(page.id);
+            setEditTitle(page.title);
+        } catch (err) {
+            setCreateError(err instanceof Error ? err.message : "Не удалось создать страницу");
+        }
     }
 
     function handleRename(page: WikiPage) {
@@ -125,7 +133,7 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
                 <div className="sidebar__workspace-icon">F</div>
                 <div className="sidebar__workspace-info">
                     <span className="sidebar__logo">FlowNote</span>
-                    <span className="sidebar__plan">Workspace</span>
+                    <span className="sidebar__plan">{user?.login ?? user?.email ?? "…"}</span>
                 </div>
                 <button className="sidebar__toggle" onClick={onToggle} title="Свернуть панель">
                     <IconChevronLeft/>
@@ -201,9 +209,14 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
 
             {/* Footer */}
             <div className="sidebar__footer">
-                <button className="sidebar__new-page" onClick={handleCreate}>
+                <button className="sidebar__new-page" onClick={() => void handleCreate()}>
                     <IconPlus/> Новая страница
                 </button>
+                {createError && (
+                    <div style={{fontSize:"var(--fs-xs)",color:"var(--error,#e55)",padding:"4px 8px",wordBreak:"break-word"}}>
+                        {createError}
+                    </div>
+                )}
             </div>
         </aside>
     );

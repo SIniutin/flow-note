@@ -2,7 +2,7 @@ SECRETS_DIR := secrets
 PRIVATE_KEY  := $(SECRETS_DIR)/jwt_private_key.pem
 PUBLIC_KEY   := $(SECRETS_DIR)/jwt_public_key.pem
 
-.PHONY: up down restart logs keys frontend dev auth-clear
+.PHONY: up down restart logs keys frontend dev auth-clear node-deps
 
 ## Generate JWT keys if missing
 keys:
@@ -15,8 +15,21 @@ keys:
 		echo "Keys already exist, skipping."; \
 	fi
 
+## Ensure local Node.js dependencies exist for project packages
+node-deps:
+	@for dir in collab-service meta-parser frontend; do \
+		if [ -f "$$dir/package.json" ]; then \
+			if [ ! -d "$$dir/node_modules" ]; then \
+				echo "Installing npm dependencies in $$dir..."; \
+				(cd "$$dir" && npm install); \
+			else \
+				echo "$$dir dependencies already installed, skipping."; \
+			fi; \
+		fi; \
+	done
+
 ## Build and start the full backend stack
-up: keys
+up: keys node-deps
 	docker compose up --build -d
 
 ## Stop all services

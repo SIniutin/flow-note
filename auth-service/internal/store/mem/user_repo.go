@@ -61,6 +61,21 @@ func (r *userRepoImpl) Create(ctx context.Context, u d.User, password d.Password
 	return u, nil
 }
 
+func (r *userRepoImpl) GetByID(ctx context.Context, id d.UserID) (d.User, error) {
+	if err := ctx.Err(); err != nil {
+		return d.User{}, err
+	}
+
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	u, ok := r.userByID[id]
+	if !ok {
+		return d.User{}, d.ErrNotFound
+	}
+	return u, nil
+}
+
 func (r *userRepoImpl) GetByEmail(ctx context.Context, email d.Email) (d.User, error) {
 	if err := ctx.Err(); err != nil {
 		return d.User{}, err

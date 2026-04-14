@@ -15,14 +15,15 @@ import {findThreadRange} from "./editor/comments/findThreadRange";
 import {clearAll} from "./editor/persistence/storage";
 import {useSaveStatus} from "./editor/persistence/useSaveStatus";
 import {MentionMenu} from "./editor/mention/MentionMenu";
-import {getAllUsers} from "./data/users";
-import {useCurrentUser, changeCurrentUser} from "./data/useCurrentUser";
+import {useCurrentUser} from "./data/useCurrentUser";
+import {useAuth} from "./data/authStore";
 import {ToolbarRefContext, type ToolbarRefHandle} from "./editor/ToolbarRefContext";
 import {TablePickerModal} from "./editor/mwsTable/TablePickerModal";
 import {PresenceAvatars} from "./editor/collab/PresenceAvatars";
 import {EmojiPickerPopover} from "./editor/emoji/EmojiPickerPopover";
 import {Sidebar} from "./components/Sidebar";
 import {pagesStore, useCurrentPage} from "./data/pagesStore";
+import {pageUsersStore} from "./data/pageUsersStore";
 import * as collabProvider from "./editor/collab/collabProvider";
 import {VersionHistory} from "./editor/history/VersionHistory";
 import {historyStore} from "./editor/history/historyStore";
@@ -51,18 +52,21 @@ export default function App() {
         collabProvider.connectCollab(pageId);
     }
 
-    // При первом монтировании: запускаем workspace-провайдер.
+    // При первом монтировании: загружаем список страниц с бэкенда.
     useEffect(() => {
-        collabProvider.initWorkspaceProvider(() => pagesStore.onWorkspaceSynced());
+        void pagesStore.loadFromBackend();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // После автообновления JWT-токена переподключаем провайдеры без ремонта редактора.
+    // При смене страницы: загружаем пользователей с доступом (для @ mention).
     useEffect(() => {
-        const handler = () => {
-            collabProvider.reconnectPageProvider(pageId);
-            collabProvider.initWorkspaceProvider(() => pagesStore.onWorkspaceSynced());
-        };
+        pageUsersStore.reset(pageId);
+        void pageUsersStore.load(pageId);
+    }, [pageId]);
+
+    // После автообновления JWT-токена переподключаем page-провайдер без ремонта редактора.
+    useEffect(() => {
+        const handler = () => { collabProvider.reconnectPageProvider(pageId); };
         window.addEventListener("auth:token-refreshed", handler);
         return () => window.removeEventListener("auth:token-refreshed", handler);
     }, [pageId]);
@@ -80,6 +84,7 @@ export default function App() {
     }, []);
 
     const currentUser = useCurrentUser();
+    const { user, logout: authLogout } = useAuth();
     // key={pageId} заставляет TipTap пересоздаться при смене страницы
     // (подхватывает новый ydoc из connectCollab)
     const editor = useEditorInstance(currentUser, pageId);
@@ -229,18 +234,13 @@ export default function App() {
     const tabs = (
         <>
             <PresenceAvatars/>
-            <select
-                value={currentUser.id}
-                onChange={e => changeCurrentUser(e.target.value)}
-                style={{
-                    fontSize: "var(--fs-sm)", padding: "2px 6px",
-                    border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)",
-                    background: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer",
-                }}
-                onClick={e => e.stopPropagation()}
-            >
-                {getAllUsers().map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
+            <span style={{fontSize:"var(--fs-sm)",color:"var(--text-secondary)"}}>
+                {user?.login ?? user?.email ?? ""}
+            </span>
+            <a style={{cursor:"pointer",color:"var(--text-tertiary)",fontSize:"var(--fs-sm)"}}
+               onClick={() => void authLogout()}>
+                Выйти
+            </a>
 
             <a style={{cursor:"pointer", color: rightPanel==="comments" ? "var(--accent)" : undefined}}
                onClick={() => setRightPanel(p => p === "comments" ? null : "comments")}>

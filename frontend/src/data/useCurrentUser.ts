@@ -1,19 +1,20 @@
-import { useEffect, useState } from "react";
-import { getCurrentUserId, setCurrentUserId, getUserById, type User, DEFAULT_USER_ID } from "./users";
+import { useAuth, getCurrentUserId } from "./authStore";
 
-const listeners = new Set<() => void>();
-
-export function changeCurrentUser(id: string): void {
-    setCurrentUserId(id);
-    listeners.forEach(l => l());
+export interface EditorUser {
+    id: string;
+    name: string;
+    colorIndex: 1 | 2 | 3 | 4;
 }
 
-export function useCurrentUser(): User {
-    const [id, setId] = useState<string>(() => getCurrentUserId());
-    useEffect(() => {
-        const l = () => setId(getCurrentUserId());
-        listeners.add(l);
-        return () => { listeners.delete(l); };
-    }, []);
-    return getUserById(id) ?? getUserById(DEFAULT_USER_ID)!;
+function colorFromId(id: string): 1 | 2 | 3 | 4 {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    return ((h % 4) + 1) as 1 | 2 | 3 | 4;
+}
+
+export function useCurrentUser(): EditorUser {
+    const { user } = useAuth();
+    const id   = user?.id   ?? getCurrentUserId() ?? "anonymous";
+    const name = user?.login ?? user?.email       ?? id;
+    return { id, name, colorIndex: colorFromId(id) };
 }

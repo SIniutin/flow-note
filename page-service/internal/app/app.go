@@ -41,9 +41,9 @@ func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, erro
 
 	db.SetupPostgres(dbPool, logger)
 
-	key, err := authsecurity.ParseRSAPublicKeyPEM(cfg.JWT.PublicKey)
+	key, err := authsecurity.LoadRSAPublicKeyFromPEMFile(cfg.JWT.PublicKeyPath)
 	if err != nil {
-		logger.Fatal("failed to parse RSA public key", zap.String("key", string(cfg.JWT.PublicKey)), zap.Error(err))
+		logger.Fatal("failed to parse RSA public key", zap.String("key", cfg.JWT.PublicKeyPath), zap.Error(err))
 	}
 
 	verifier := authsecurity.NewRS256Verifier(key, cfg.JWT.Issuer, cfg.JWT.Audience)

@@ -1,12 +1,9 @@
 // ─── src/data/pagesStore.ts ────────────────────────────────────────────────────
-// Список страниц хранится в Y.Map внутри shared workspace-документа.
-// Все клиенты видят одни и те же страницы через Hocuspocus-синхронизацию.
-//
-// Текущая выбранная страница (_currentId) остаётся в localStorage —
-// это per-browser состояние, общей синхронизации не требует.
+// Список страниц каждого пользователя хранится на бэкенде (page-service).
+// Локально держим кэш в localStorage для мгновенного отображения при загрузке.
 
 import { useEffect, useState } from "react";
-import { workspaceDoc } from "../editor/collab/collabProvider";
+import { pageClient } from "../api/pageClient";
 
 export interface WikiPage {
     id:        string;
@@ -16,40 +13,18 @@ export interface WikiPage {
     updatedAt: string;
 }
 
-// ── Yjs map ────────────────────────────────────────────────────────────────────
-// Ключ: page.id, значение: JSON-строка WikiPage
-const yPages = workspaceDoc.getMap<string>("pages");
-
 // ── localStorage keys ─────────────────────────────────────────────────────────
-const LS_PAGES_CACHE = "wiki:pages:v1";          // кэш для offline-fallback
-const LS_CURRENT     = "wiki:current-page:v1";
+const LS_PAGES_CACHE = "wiki:pages:v2";
+const LS_CURRENT     = "wiki:current-page:v2";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function uuid(): string {
-    return "page_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
-}
-
-function buildFromYMap(): WikiPage[] {
-    const result: WikiPage[] = [];
-    yPages.forEach((json) => {
-        try { result.push(JSON.parse(json) as WikiPage); } catch { /* skip invalid */ }
-    });
-    return result.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-}
 
 function loadLocalCache(): WikiPage[] {
     try {
         const raw = localStorage.getItem(LS_PAGES_CACHE);
         if (raw) return JSON.parse(raw) as WikiPage[];
     } catch { /* ignore */ }
-    return [{
-        id:        "page-default",
-        title:     "Главная",
-        icon:      "🏠",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-    }];
+    return [];
 }
 
 function saveLocalCache(pages: WikiPage[]): void {
@@ -58,76 +33,76 @@ function saveLocalCache(pages: WikiPage[]): void {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-// Если Y.Map пуст (бэкенд ещё не подключён) — сразу засеиваем из localStorage.
-// Это позволяет CRUD работать оффлайн; при синхронизации Yjs CRDT сделает merge.
-if (yPages.size === 0) {
-    const local = loadLocalCache();
-    workspaceDoc.transact(() => {
-        local.forEach(p => yPages.set(p.id, JSON.stringify(p)));
-    });
-}
-
-let _pages: WikiPage[] = buildFromYMap();
-let _currentId: string = localStorage.getItem(LS_CURRENT) ?? _pages[0]?.id ?? "page-default";
+let _pages: WikiPage[]    = loadLocalCache();
+let _currentId: string    = localStorage.getItem(LS_CURRENT) ?? _pages[0]?.id ?? "";
 
 const listeners = new Set<() => void>();
 function notify() { listeners.forEach(l => l()); }
 
-function ensureCurrentIdValid(): void {
+function setPages(pages: WikiPage[]): void {
+    _pages = pages;
+    saveLocalCache(pages);
     if (!_pages.find(p => p.id === _currentId)) {
-        _currentId = _pages[0]?.id ?? "page-default";
+        _currentId = _pages[0]?.id ?? "";
         try { localStorage.setItem(LS_CURRENT, _currentId); } catch { /* ignore */ }
     }
-}
-
-// ── Observe Y.Map changes (local + remote) ────────────────────────────────────
-
-yPages.observe(() => {
-    const fresh = buildFromYMap();
-    // Не обнуляем страницы если Y.Map стал пустым (защита от race condition)
-    _pages = fresh.length > 0 ? fresh : _pages;
-    saveLocalCache(_pages);
-    ensureCurrentIdValid();
     notify();
-});
+}
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export const pagesStore = {
-    getAll():    WikiPage[]       { return _pages; },
-    getCurrent(): WikiPage | null { return _pages.find(p => p.id === _currentId) ?? _pages[0] ?? null; },
-    getCurrentId(): string        { return _currentId; },
+    getAll():     WikiPage[]       { return _pages; },
+    getCurrent(): WikiPage | null  { return _pages.find(p => p.id === _currentId) ?? _pages[0] ?? null; },
+    getCurrentId(): string         { return _currentId; },
     get(id: string): WikiPage | null { return _pages.find(p => p.id === id) ?? null; },
 
-    create(title: string, icon = "📄"): WikiPage {
+    /** Загружает страницы с бэкенда. Вызывается после аутентификации. */
+    async loadFromBackend(): Promise<void> {
+        try {
+            const { pages } = await pageClient.listAllowed();
+            const mapped: WikiPage[] = pages.map(bp => ({
+                id:        bp.id,
+                title:     bp.title,
+                createdAt: bp.createdAt,
+                updatedAt: bp.updatedAt,
+            }));
+            setPages(mapped);
+        } catch (err) {
+            console.warn("[pagesStore] loadFromBackend failed:", err);
+        }
+    },
+
+    async create(title: string, icon = "📄"): Promise<WikiPage> {
+        const { page: bp } = await pageClient.create(title.trim() || "Без названия");
         const page: WikiPage = {
-            id:        uuid(),
-            title:     title.trim() || "Без названия",
+            id:        bp.id,
+            title:     bp.title,
             icon,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            createdAt: bp.createdAt,
+            updatedAt: bp.updatedAt,
         };
-        yPages.set(page.id, JSON.stringify(page));
+        setPages([..._pages, page]);
         return page;
     },
 
     updateTitle(id: string, title: string): void {
-        const json = yPages.get(id);
-        if (!json) return;
-        const page = JSON.parse(json) as WikiPage;
-        yPages.set(id, JSON.stringify({
-            ...page,
-            title:     title.trim() || "Без названия",
-            updatedAt: new Date().toISOString(),
-        }));
+        setPages(_pages.map(p =>
+            p.id === id
+                ? { ...p, title: title.trim() || "Без названия", updatedAt: new Date().toISOString() }
+                : p
+        ));
     },
 
     delete(id: string): void {
         const next = _pages.find(p => p.id !== id);
-        yPages.delete(id);
+        setPages(_pages.filter(p => p.id !== id));
         if (_currentId === id) {
-            pagesStore.setCurrentId(next?.id ?? "page-default");
+            pagesStore.setCurrentId(next?.id ?? "");
         }
+        pageClient.delete(id).catch(err =>
+            console.warn("[pagesStore] delete failed:", err)
+        );
     },
 
     setCurrentId(id: string): void {
@@ -140,20 +115,6 @@ export const pagesStore = {
     subscribe(l: () => void): () => void {
         listeners.add(l);
         return () => { listeners.delete(l); };
-    },
-
-    /**
-     * Вызывается после первой синхронизации workspace-документа.
-     * Если workspace пуст — мигрируем страницы из localStorage.
-     */
-    onWorkspaceSynced(): void {
-        if (yPages.size === 0) {
-            const local = loadLocalCache();
-            workspaceDoc.transact(() => {
-                local.forEach(p => yPages.set(p.id, JSON.stringify(p)));
-            });
-            console.log("[pagesStore] migrated", local.length, "pages from localStorage to workspace");
-        }
     },
 };
 

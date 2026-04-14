@@ -1,27 +1,28 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.24 AS builder
+FROM golang:1.26-alpine AS build
 
-WORKDIR /app
+WORKDIR /src/page-service
 
-COPY go.mod go.sum ./
+COPY common /src/common
+COPY api-contracts /src/api-contracts
+COPY page-service/go.mod page-service/go.sum ./
+
 RUN go mod download
 
-COPY . .
+COPY page-service/cmd ./cmd
+COPY page-service/config ./config
+COPY page-service/db ./db
+COPY page-service/internal ./internal
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /page-service ./cmd/page-service
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/page-service ./cmd/pages
 
-FROM alpine:3.20
+FROM alpine:3.21
 
 WORKDIR /app
 
-RUN addgroup -S app && adduser -S app -G app
-
-COPY --from=builder /page-service /app/page-service
-COPY .env /app/.env
-
-USER app
+COPY --from=build /out/page-service /usr/local/bin/page-service
 
 EXPOSE 8080 50051
 
-CMD ["/app/page-service"]
+ENTRYPOINT ["/usr/local/bin/page-service"]

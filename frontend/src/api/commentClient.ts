@@ -1,21 +1,20 @@
 // ─── src/api/commentClient.ts ─────────────────────────────────────────────────
-// HTTP клиент для CommentService (gRPC-gateway).
-// Пути — gRPC-стиль (/comment.v1.CommentService/{Method}), т.к. proto не имеет
-// google.api.http аннотаций. gRPC-gateway сериализует поля в lowerCamelCase.
+// HTTP клиент для CommentService (gRPC-gateway REST).
+// Пути и методы берутся из swagger: api-contracts/docs/spec/proto/comment/v1/comment.swagger.json
 
 import { getAccessToken } from "../data/authStore";
 
-// ── Types (соответствуют proto comment.v1) ────────────────────────────────────
+// ── Types (соответствуют swagger comment.v1) ──────────────────────────────────
 
 export interface ProtoComment {
     id:        string;
     userId:    string;
-    parentId:  string;   // "" — корневой комментарий
+    parentId:  string;
     pageId:    string;
     bodyId:    string;
     deleted:   boolean;
     body:      string;
-    createdAt: string;   // ISO от grpc Timestamp
+    createdAt: string;
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -27,11 +26,11 @@ function authHeaders(): Record<string, string> {
     return headers;
 }
 
-async function post<T>(path: string, body: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await fetch(path, {
-        method: "POST",
+        method,
         headers: authHeaders(),
-        body: JSON.stringify(body),
+        body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
         const text = await res.text().catch(() => "");
@@ -46,18 +45,15 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 // ── API ───────────────────────────────────────────────────────────────────────
 
 export const commentClient = {
-    /**
-     * Создать комментарий (или ответ, если указан parentId).
-     * POST /comment.v1.CommentService/MakeComment
-     */
+    // POST /v1/comments
     makeComment(params: {
-        userId:   string;
-        pageId:   string;
-        body:     string;
+        userId:    string;
+        pageId:    string;
+        body:      string;
         parentId?: string;
         bodyId?:   string;
     }): Promise<{ comment: ProtoComment }> {
-        return post("/comment.v1.CommentService/MakeComment", {
+        return request("POST", "/v1/comments", {
             userId:   params.userId,
             pageId:   params.pageId,
             body:     params.body,
@@ -66,35 +62,23 @@ export const commentClient = {
         });
     },
 
-    /**
-     * Список комментариев страницы.
-     * POST /comment.v1.CommentService/ListComments
-     */
+    // GET /v1/comments?pageId=...
     listComments(pageId: string): Promise<{ comments: ProtoComment[] }> {
-        return post("/comment.v1.CommentService/ListComments", { pageId });
+        return request("GET", `/v1/comments?pageId=${encodeURIComponent(pageId)}`);
     },
 
-    /**
-     * Один комментарий по id.
-     * POST /comment.v1.CommentService/GetComment
-     */
+    // GET /v1/comments/{commentId}
     getComment(commentId: string): Promise<{ comment: ProtoComment }> {
-        return post("/comment.v1.CommentService/GetComment", { commentId });
+        return request("GET", `/v1/comments/${encodeURIComponent(commentId)}`);
     },
 
-    /**
-     * Подписаться на уведомления о комментариях страницы.
-     * POST /comment.v1.CommentService/SubscribeToComment
-     */
+    // POST /v1/comments/subscriptions
     subscribe(userId: string, pageId: string): Promise<void> {
-        return post("/comment.v1.CommentService/SubscribeToComment", { userId, pageId });
+        return request("POST", "/v1/comments/subscriptions", { userId, pageId });
     },
 
-    /**
-     * Отписаться от уведомлений.
-     * POST /comment.v1.CommentService/UnsubscribeToComment
-     */
+    // DELETE /v1/comments/subscriptions/{pageId}/{userId}
     unsubscribe(userId: string, pageId: string): Promise<void> {
-        return post("/comment.v1.CommentService/UnsubscribeToComment", { userId, pageId });
+        return request("DELETE", `/v1/comments/subscriptions/${encodeURIComponent(pageId)}/${encodeURIComponent(userId)}`);
     },
 };

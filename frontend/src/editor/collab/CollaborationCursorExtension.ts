@@ -33,6 +33,7 @@ export const CollaborationCursorExtension = Extension.create({
     name: "collaborationCursor",
 
     addProseMirrorPlugins() {
+        if (!collabProvider.awareness) return [];
         return [
             yCursorPlugin(collabProvider.awareness, {
                 cursorBuilder: buildCursor,
