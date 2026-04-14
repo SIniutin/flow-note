@@ -11,11 +11,11 @@ import (
 	commonpg "github.com/flow-note/common/postgres"
 	commonrt "github.com/flow-note/common/realtime"
 	cr "github.com/flow-note/common/runtime"
-	"github.com/flow-note/notify-service/internal/adapter/consumer"
-	grpcAdapter "github.com/flow-note/notify-service/internal/adapter/grpc"
-	pgAdapter "github.com/flow-note/notify-service/internal/adapter/postgres"
+	migrate "github.com/flow-note/notify-service/db"
 	"github.com/flow-note/notify-service/internal/config"
-	"github.com/flow-note/notify-service/internal/migrate"
+	"github.com/flow-note/notify-service/internal/infra/consumer"
+	pgAdapter "github.com/flow-note/notify-service/internal/infra/postgres"
+	grpcAdapter "github.com/flow-note/notify-service/internal/transport/grpc"
 	"github.com/flow-note/notify-service/internal/usecase"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -41,21 +41,17 @@ func New(cfg config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// ── Migrations ────────────────────────────────────────────────────────────
 	if err := migrate.Up(context.Background(), cfg.PostgresDSN); err != nil {
 		logger.Warn("migration failed — continuing", zap.Error(err))
 	}
 
-	// ── Database ──────────────────────────────────────────────────────────────
 	db, err := commonpg.New(context.Background(), cfg.PostgresDSN)
 	if err != nil {
 		return nil, err
 	}
 
-	// ── Redis (real-time pub/sub) ─────────────────────────────────────────────
 	rt := commonrt.NewRedisPublisher(cfg.RedisAddr)
 
-	// ── RabbitMQ ──────────────────────────────────────────────────────────────
 	rmq, err := broker.NewRabbitMQ(cfg.BrokerURL, cfg.BrokerExchange)
 	if err != nil {
 		db.Close()
@@ -63,18 +59,16 @@ func New(cfg config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// ── Repository & use cases ────────────────────────────────────────────────
 	repo := pgAdapter.NewRepository(db)
 
 	getNotifications := usecase.NewGetNotifications(repo)
-	markRead         := usecase.NewMarkRead(repo)
-	markAllRead      := usecase.NewMarkAllRead(repo)
-	processEvent     := usecase.NewProcessEvent(repo, rt)
+	markRead := usecase.NewMarkRead(repo)
+	markAllRead := usecase.NewMarkAllRead(repo)
+	processEvent := usecase.NewProcessEvent(repo, rt)
 
 	amqpConsumer := consumer.New(rmq, cfg.BrokerQueue, processEvent)
 
-	// ── gRPC interceptors ─────────────────────────────────────────────────────
-	unaryInterceptors  := []grpc.UnaryServerInterceptor{cr.RecoveryUnaryServerInterceptor(logger)}
+	unaryInterceptors := []grpc.UnaryServerInterceptor{cr.RecoveryUnaryServerInterceptor(logger)}
 	streamInterceptors := []grpc.StreamServerInterceptor{cr.RecoveryStreamServerInterceptor(logger)}
 
 	if cfg.JWTPublicKeyPEM != "" {
@@ -83,12 +77,11 @@ func New(cfg config.Config) (*App, error) {
 			logger.Warn("jwt public key load failed — auth interceptor disabled", zap.Error(err))
 		} else {
 			verifier := authsecurity.NewRS256Verifier(pub, cfg.JWTIssuer, cfg.JWTAudience)
-			unaryInterceptors  = append(unaryInterceptors, grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{}))
+			unaryInterceptors = append(unaryInterceptors, grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{}))
 			streamInterceptors = append(streamInterceptors, grpcauth.StreamAuthInterceptor(verifier, map[string]struct{}{}))
 		}
 	}
 
-	// ── gRPC server ───────────────────────────────────────────────────────────
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(unaryInterceptors...),
 		grpc.ChainStreamInterceptor(streamInterceptors...),
@@ -119,8 +112,6 @@ func New(cfg config.Config) (*App, error) {
 	}, nil
 }
 
-// Serve starts the gRPC server and the AMQP consumer concurrently.
-// Returns when either component exits (error or shutdown).
 func (a *App) Serve() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -140,12 +131,10 @@ func (a *App) Serve() error {
 	return g.Wait()
 }
 
-// GracefulStop signals the gRPC server to finish in-flight requests.
 func (a *App) GracefulStop() {
 	a.server.GracefulStop()
 }
 
-// Close releases all infrastructure connections.
 func (a *App) Close() {
 	if a.realtime != nil {
 		_ = a.realtime.Close()

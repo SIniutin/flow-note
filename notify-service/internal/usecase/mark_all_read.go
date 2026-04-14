@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/flow-note/notify-service/internal/domain/port"
+	port "github.com/flow-note/notify-service/internal/domain/interfaces"
 	"github.com/google/uuid"
 )
 

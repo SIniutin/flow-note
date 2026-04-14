@@ -6,7 +6,7 @@ import (
 
 	commonpg "github.com/flow-note/common/postgres"
 	"github.com/flow-note/notify-service/internal/domain"
-	"github.com/flow-note/notify-service/internal/domain/port"
+	port "github.com/flow-note/notify-service/internal/domain/interfaces"
 	"github.com/google/uuid"
 )
 

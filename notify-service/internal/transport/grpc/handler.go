@@ -7,7 +7,7 @@ import (
 	notificationsv1 "github.com/flow-note/api-contracts/generated/proto/notify/v1"
 	"github.com/flow-note/common/authctx"
 	"github.com/flow-note/notify-service/internal/domain"
-	"github.com/flow-note/notify-service/internal/domain/port"
+	port "github.com/flow-note/notify-service/internal/domain/interfaces"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
