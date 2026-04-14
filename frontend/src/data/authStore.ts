@@ -1,7 +1,7 @@
 // ─── src/data/authStore.ts ────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
-import { authClient, type AuthUser, type TokenPair } from "../api/authClient";
+import { authClient, HttpError, type AuthUser, type TokenPair } from "../api/authClient";
 
 const LS_ACCESS  = "auth:access_token";
 const LS_REFRESH = "auth:refresh_token";
@@ -78,6 +78,8 @@ function clearRefreshTimer() {
     if (_refreshTimer !== null) { clearTimeout(_refreshTimer); _refreshTimer = null; }
 }
 
+const REFRESH_RETRY_DELAY_MS = 30_000; // повтор через 30 с при сетевой ошибке
+
 async function performRefresh(): Promise<void> {
     if (!_refreshToken) { wipe(); notify(); return; }
     try {
@@ -87,10 +89,17 @@ async function performRefresh(): Promise<void> {
         scheduleTokenRefresh();
         // Сообщаем провайдерам что нужно переподключиться с новым токеном
         window.dispatchEvent(new CustomEvent("auth:token-refreshed"));
-    } catch {
-        // refresh_token протух — разлогиниваем
-        wipe();
-        notify();
+    } catch (err) {
+        if (err instanceof HttpError && (err.status === 401 || err.status === 403)) {
+            // refresh-токен точно протух — разлогиниваем
+            wipe();
+            notify();
+        } else {
+            // Сетевая ошибка или временная недоступность сервера — не разлогиниваем,
+            // повторяем попытку через REFRESH_RETRY_DELAY_MS.
+            console.warn("[auth] refresh failed, retrying in 30s:", err);
+            _refreshTimer = setTimeout(() => void performRefresh(), REFRESH_RETRY_DELAY_MS);
+        }
     }
 }
 

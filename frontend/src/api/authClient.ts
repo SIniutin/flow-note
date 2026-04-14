@@ -18,17 +18,26 @@ export interface AuthResponse {
     tokens: TokenPair;
 }
 
+export class HttpError extends Error {
+    constructor(public readonly status: number, message: string) {
+        super(message);
+        this.name = "HttpError";
+    }
+}
+
+async function readError(res: Response): Promise<HttpError> {
+    const text = await res.text().catch(() => "");
+    let message = text;
+    try { message = JSON.parse(text).message ?? text; } catch { /* raw text */ }
+    return new HttpError(res.status, message || `HTTP ${res.status}`);
+}
+
 async function get<T>(path: string, accessToken?: string): Promise<T> {
     const headers: Record<string, string> = {};
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
     const res = await fetch(path, { method: "GET", headers });
-    if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        let message = text;
-        try { message = JSON.parse(text).message ?? text; } catch { /* raw text */ }
-        throw new Error(message || `HTTP ${res.status}`);
-    }
+    if (!res.ok) throw await readError(res);
     return res.json();
 }
 
@@ -37,12 +46,7 @@ async function post<T>(path: string, body: unknown, accessToken?: string): Promi
     if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
     const res = await fetch(path, { method: "POST", headers, body: JSON.stringify(body) });
-    if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        let message = text;
-        try { message = JSON.parse(text).message ?? text; } catch { /* raw text */ }
-        throw new Error(message || `HTTP ${res.status}`);
-    }
+    if (!res.ok) throw await readError(res);
     // 204 / empty body
     const ct = res.headers.get("content-type") ?? "";
     if (!ct.includes("application/json")) return undefined as T;
