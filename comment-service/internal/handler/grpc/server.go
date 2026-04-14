@@ -7,6 +7,7 @@ import (
 	commentv1 "github.com/flow-note/api-contracts/generated/proto/comment/v1"
 	"github.com/flow-note/comment-service/internal/domain"
 	commentservice "github.com/flow-note/comment-service/internal/service"
+	"github.com/flow-note/common/authctx"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,16 +26,17 @@ func New(service *commentservice.Service) *Server {
 }
 
 func (s *Server) MakeComment(ctx context.Context, req *commentv1.CreateCommentRequest) (*commentv1.CreateCommentResponce, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, status.Error(codes.Canceled, err.Error())
-	}
-
-	cmd, err := toCreateCommentCommand(req)
+	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	comment, err := s.service.MakeComment(ctx, cmd)
+	cmd, err := toCreateCommentCommand(req, cred.UserId)
+	if err != nil {
+		return nil, err
+	}
+
+	comment, err := s.service.MakeComment(ctx, cred, cmd)
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
@@ -43,40 +45,43 @@ func (s *Server) MakeComment(ctx context.Context, req *commentv1.CreateCommentRe
 }
 
 func (s *Server) SubscribeToComment(ctx context.Context, req *commentv1.SubscribeToCommentRequest) (*emptypb.Empty, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, status.Error(codes.Canceled, err.Error())
-	}
-
-	cmd, err := toSubscribeCommand(req.GetUserId(), req.GetPageId())
+	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.service.SubscribeToComments(ctx, cmd); err != nil {
+	cmd, err := toSubscribeCommand(cred.UserId, req.GetPageId())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.service.SubscribeToComments(ctx, cred, cmd); err != nil {
 		return nil, mapDomainError(err)
 	}
 	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) UnsubscribeToComment(ctx context.Context, req *commentv1.UnsubscribeToCommentRequest) (*emptypb.Empty, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, status.Error(codes.Canceled, err.Error())
-	}
-
-	cmd, err := toUnsubscribeCommand(req.GetUserId(), req.GetPageId())
+	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := s.service.UnsubscribeFromComments(ctx, cmd); err != nil {
+	cmd, err := toUnsubscribeCommand(cred.UserId, req.GetPageId())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.service.UnsubscribeFromComments(ctx, cred, cmd); err != nil {
 		return nil, mapDomainError(err)
 	}
 	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) ListComments(ctx context.Context, req *commentv1.ListCommentsRequest) (*commentv1.ListCommentsResponse, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, status.Error(codes.Canceled, err.Error())
+	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	pageID, err := parseUUID(req.GetPageId(), "page_id")
@@ -84,7 +89,7 @@ func (s *Server) ListComments(ctx context.Context, req *commentv1.ListCommentsRe
 		return nil, err
 	}
 
-	items, err := s.service.ListComments(ctx, domain.ListCommentsQuery{PageID: pageID})
+	items, err := s.service.ListComments(ctx, cred, domain.ListCommentsQuery{PageID: pageID})
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
@@ -98,8 +103,9 @@ func (s *Server) ListComments(ctx context.Context, req *commentv1.ListCommentsRe
 }
 
 func (s *Server) GetComment(ctx context.Context, req *commentv1.GetCommentRequest) (*commentv1.GetCommentResponce, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, status.Error(codes.Canceled, err.Error())
+	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	commentID, err := parseUUID(req.GetCommentId(), "comment_id")
@@ -107,7 +113,7 @@ func (s *Server) GetComment(ctx context.Context, req *commentv1.GetCommentReques
 		return nil, err
 	}
 
-	comment, err := s.service.GetComment(ctx, commentID)
+	comment, err := s.service.GetComment(ctx, cred, commentID)
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
@@ -115,11 +121,7 @@ func (s *Server) GetComment(ctx context.Context, req *commentv1.GetCommentReques
 	return &commentv1.GetCommentResponce{Comment: toProtoComment(comment)}, nil
 }
 
-func toCreateCommentCommand(req *commentv1.CreateCommentRequest) (domain.CreateCommentCommand, error) {
-	userID, err := parseUUID(req.GetUserId(), "user_id")
-	if err != nil {
-		return domain.CreateCommentCommand{}, err
-	}
+func toCreateCommentCommand(req *commentv1.CreateCommentRequest, userID uuid.UUID) (domain.CreateCommentCommand, error) {
 	pageID, err := parseUUID(req.GetPageId(), "page_id")
 	if err != nil {
 		return domain.CreateCommentCommand{}, err
@@ -150,11 +152,7 @@ func toCreateCommentCommand(req *commentv1.CreateCommentRequest) (domain.CreateC
 	return cmd, nil
 }
 
-func toSubscribeCommand(rawUserID, rawPageID string) (domain.SubscribeToCommentsCommand, error) {
-	userID, err := parseUUID(rawUserID, "user_id")
-	if err != nil {
-		return domain.SubscribeToCommentsCommand{}, err
-	}
+func toSubscribeCommand(userID uuid.UUID, rawPageID string) (domain.SubscribeToCommentsCommand, error) {
 	pageID, err := parseUUID(rawPageID, "page_id")
 	if err != nil {
 		return domain.SubscribeToCommentsCommand{}, err
@@ -166,11 +164,7 @@ func toSubscribeCommand(rawUserID, rawPageID string) (domain.SubscribeToComments
 	return cmd, nil
 }
 
-func toUnsubscribeCommand(rawUserID, rawPageID string) (domain.UnsubscribeFromCommentsCommand, error) {
-	userID, err := parseUUID(rawUserID, "user_id")
-	if err != nil {
-		return domain.UnsubscribeFromCommentsCommand{}, err
-	}
+func toUnsubscribeCommand(userID uuid.UUID, rawPageID string) (domain.UnsubscribeFromCommentsCommand, error) {
 	pageID, err := parseUUID(rawPageID, "page_id")
 	if err != nil {
 		return domain.UnsubscribeFromCommentsCommand{}, err

@@ -8,6 +8,8 @@ import (
 	"github.com/flow-note/comment-service/internal/domain"
 	"github.com/flow-note/comment-service/internal/repository"
 	"github.com/flow-note/common/apperrors"
+	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 )
 
@@ -25,7 +27,11 @@ func New(txManager repository.TxManager, comments repository.CommentRepository, 
 	}
 }
 
-func (s *Service) MakeComment(ctx context.Context, cmd domain.CreateCommentCommand) (domain.Comment, error) {
+func (s *Service) MakeComment(ctx context.Context, credentials *authctx.UserCredentials, cmd domain.CreateCommentCommand) (domain.Comment, error) {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
+		return domain.Comment{}, perm.ErrCommentPermissionRequired
+	}
+
 	comment, err := domain.NewComment(time.Now().UTC(), cmd)
 	if err != nil {
 		return domain.Comment{}, err
@@ -51,15 +57,27 @@ func (s *Service) MakeComment(ctx context.Context, cmd domain.CreateCommentComma
 	return comment, nil
 }
 
-func (s *Service) GetComment(ctx context.Context, commentID uuid.UUID) (domain.Comment, error) {
+func (s *Service) GetComment(ctx context.Context, credentials *authctx.UserCredentials, commentID uuid.UUID) (domain.Comment, error) {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
+		return domain.Comment{}, perm.ErrCommentPermissionRequired
+	}
+
 	return s.comments.GetComment(ctx, domain.GetCommentQuery{CommentID: commentID})
 }
 
-func (s *Service) ListComments(ctx context.Context, query domain.ListCommentsQuery) ([]domain.Comment, error) {
+func (s *Service) ListComments(ctx context.Context, credentials *authctx.UserCredentials, query domain.ListCommentsQuery) ([]domain.Comment, error) {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
+		return []domain.Comment{}, perm.ErrCommentPermissionRequired
+	}
+
 	return s.comments.ListComments(ctx, query)
 }
 
-func (s *Service) DeleteComment(ctx context.Context, actorID, commentID uuid.UUID) error {
+func (s *Service) DeleteComment(ctx context.Context, credentials *authctx.UserCredentials, actorID, commentID uuid.UUID) error {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
+		return perm.ErrCommentPermissionRequired
+	}
+
 	comment, err := s.comments.GetComment(ctx, domain.GetCommentQuery{CommentID: commentID})
 	if err != nil {
 		return err
@@ -75,7 +93,11 @@ func (s *Service) DeleteComment(ctx context.Context, actorID, commentID uuid.UUI
 	})
 }
 
-func (s *Service) SubscribeToComments(ctx context.Context, cmd domain.SubscribeToCommentsCommand) error {
+func (s *Service) SubscribeToComments(ctx context.Context, credentials *authctx.UserCredentials, cmd domain.SubscribeToCommentsCommand) error {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
+		return perm.ErrCommentPermissionRequired
+	}
+
 	subscription, err := domain.NewCommentSubscription(time.Now().UTC(), cmd)
 	if err != nil {
 		return err
@@ -94,7 +116,11 @@ func (s *Service) SubscribeToComments(ctx context.Context, cmd domain.SubscribeT
 	})
 }
 
-func (s *Service) UnsubscribeFromComments(ctx context.Context, cmd domain.UnsubscribeFromCommentsCommand) error {
+func (s *Service) UnsubscribeFromComments(ctx context.Context, credentials *authctx.UserCredentials, cmd domain.UnsubscribeFromCommentsCommand) error {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
+		return perm.ErrCommentPermissionRequired
+	}
+
 	existing, err := s.subscriptions.GetSubscription(ctx, cmd.UserID.String(), cmd.PageID.String())
 	if err != nil {
 		if errors.Is(err, apperrors.ErrNotFound) {

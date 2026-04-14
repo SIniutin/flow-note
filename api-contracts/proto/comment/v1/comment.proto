@@ -20,11 +20,10 @@ message Comment {
 }
 
 message CreateCommentRequest {
-  string user_id = 1;
-  string parent_id = 2;
-  string page_id = 3;
-  string body_id = 4;
-  string body = 5;
+  string parent_id = 1;
+  string page_id = 2;
+  string body_id = 3;
+  string body = 4;
 }
 
 message ListCommentsRequest {
@@ -48,13 +47,11 @@ message GetCommentRequest {
 }
 
 message SubscribeToCommentRequest {
-  string user_id = 1;
-  string page_id = 2;
+  string page_id = 1;
 }
 
 message UnsubscribeToCommentRequest {
-  string user_id = 1;
-  string page_id = 2;
+  string page_id = 1;
 }
 
 service CommentService {
@@ -72,7 +69,7 @@ service CommentService {
   }
   rpc UnsubscribeToComment(UnsubscribeToCommentRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
-      delete: "/v1/comments/subscriptions/{page_id}/{user_id}"
+      delete: "/v1/comments/subscriptions/{page_id}"
     };
   }
   rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse) {
