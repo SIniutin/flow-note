@@ -1,41 +1,31 @@
-import {useState, useEffect} from "react";
-import {Modal} from "./ui/surfaces";
-import {Button} from "./ui/controls";
-import {FileUpload} from "./ui/forms";
+import { useState, useEffect } from "react";
+import { Modal } from "./ui/surfaces";
+import { Button } from "./ui/controls";
+import { FileUpload } from "./ui/forms";
 
 interface Props {
     open: boolean;
     onClose: () => void;
-    onApply: (base64: string) => void;
+    onApply: (base64: string, mimeType: string, fileName: string) => void;
+    title?: string;
 }
 
-export function ImageModal({open, onClose, onApply}: Props) {
+export function ImageModal({ open, onClose, onApply, title = "Вставить изображение" }: Props) {
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (!open) {
-            setFile(null);
-            setLoading(false);
-        }
-    }, [open]);
+    useEffect(() => { if (!open) { setFile(null); setLoading(false); } }, [open]);
 
     const apply = () => {
-        console.log("ImageModal apply called, file:", file);
         if (!file) return;
         setLoading(true);
         const reader = new FileReader();
         reader.onloadend = () => {
-            const base64 = reader.result as string;
-            console.log("FileReader done, base64 length:", base64?.length);
-            onApply(base64);
+            onApply(reader.result as string, file.type, file.name);
             onClose();
             setLoading(false);
         };
-        reader.onerror = (e) => {
-            console.error("FileReader error:", e);
-            setLoading(false);
-        };
+        reader.onerror = () => setLoading(false);
         reader.readAsDataURL(file);
     };
 
@@ -43,7 +33,7 @@ export function ImageModal({open, onClose, onApply}: Props) {
         <Modal
             open={open}
             onClose={onClose}
-            title="Вставить изображение"
+            title={title}
             footer={<>
                 <Button variant="secondary" onClick={onClose}>Отмена</Button>
                 <Button disabled={!file || loading} onClick={apply}>
@@ -51,7 +41,7 @@ export function ImageModal({open, onClose, onApply}: Props) {
                 </Button>
             </>}
         >
-            <FileUpload value={file} onChange={setFile}/>
+            <FileUpload value={file} onChange={setFile} />
         </Modal>
     );
 }

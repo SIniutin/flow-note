@@ -1,0 +1,360 @@
+/* ─── Auth page ──────────────────────────────────────────────────────────────── */
+
+.auth-root {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: #f3f0ff;
+}
+
+/* ── Animated mesh background ─────────────────────────────────────────────── */
+
+.auth-bg {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 70% 70% at 15% 15%, rgba(124, 92, 255, 0.18) 0%, transparent 65%),
+        radial-gradient(ellipse 55% 55% at 85% 85%, rgba(100, 72, 245, 0.12) 0%, transparent 65%),
+        radial-gradient(ellipse 45% 45% at 70% 20%, rgba(167, 139, 255, 0.10) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 60% at 30% 80%, rgba(124, 92, 255, 0.08) 0%, transparent 65%),
+        #f3f0ff;
+    animation: auth-bg-drift 16s ease-in-out infinite alternate;
+    pointer-events: none;
+}
+
+@keyframes auth-bg-drift {
+    0%   { transform: scale(1)    rotate(0deg); }
+    50%  { transform: scale(1.04) rotate(1deg); }
+    100% { transform: scale(1.02) rotate(-1deg); }
+}
+
+/* Floating orbs */
+.auth-bg::before,
+.auth-bg::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    animation: auth-orb-float 20s ease-in-out infinite alternate;
+}
+
+.auth-bg::before {
+    width: 420px;
+    height: 420px;
+    background: rgba(124, 92, 255, 0.12);
+    top: -80px;
+    left: -100px;
+}
+
+.auth-bg::after {
+    width: 320px;
+    height: 320px;
+    background: rgba(167, 139, 255, 0.10);
+    bottom: -60px;
+    right: -60px;
+    animation-delay: -8s;
+}
+
+@keyframes auth-orb-float {
+    0%   { transform: translate(0, 0); }
+    100% { transform: translate(40px, 30px); }
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+
+.auth-card {
+    position: relative;
+    width: 420px;
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 44px 40px 40px;
+    box-shadow:
+        0 0 0 1px rgba(124, 92, 255, 0.08),
+        0 8px 24px rgba(124, 92, 255, 0.10),
+        0 24px 64px rgba(0, 0, 0, 0.08);
+    animation: auth-card-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes auth-card-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+
+/* ── Logo ─────────────────────────────────────────────────────────────────── */
+
+.auth-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 36px;
+}
+
+.auth-logo__icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #7c5cff 0%, #a78bff 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 4px 16px rgba(124, 92, 255, 0.35);
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.auth-logo__text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.auth-logo__name {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1f1f1f;
+    letter-spacing: -0.4px;
+    line-height: 1.2;
+}
+
+.auth-logo__tagline {
+    font-size: 12px;
+    color: #9a9aa3;
+    font-weight: 400;
+    letter-spacing: 0.1px;
+}
+
+/* ── Tab switcher ─────────────────────────────────────────────────────────── */
+
+.auth-tabs {
+    display: flex;
+    background: #f5f3ff;
+    border-radius: 12px;
+    padding: 4px;
+    position: relative;
+    margin-bottom: 28px;
+    gap: 0;
+}
+
+.auth-tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 9px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 9px;
+    position: relative;
+    z-index: 1;
+    transition: color 0.2s var(--ease, ease);
+    color: #9a9aa3;
+    font-family: inherit;
+}
+
+.auth-tab.is-active {
+    color: #1f1f1f;
+}
+
+.auth-tabs__slider {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: calc(50% - 4px);
+    height: calc(100% - 8px);
+    background: #ffffff;
+    border-radius: 9px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.10), 0 0 0 1px rgba(0,0,0,0.04);
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    pointer-events: none;
+}
+
+.auth-tabs__slider.is-right {
+    transform: translateX(100%);
+}
+
+/* ── Form ─────────────────────────────────────────────────────────────────── */
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.auth-field label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #6b6b73;
+    user-select: none;
+}
+
+.auth-field__input-wrap {
+    position: relative;
+}
+
+.auth-field__input-wrap input {
+    width: 100%;
+}
+
+.auth-field input,
+.auth-field__input-wrap input {
+    height: 44px;
+    padding: 0 14px;
+    border: 1.5px solid #e0e0e6;
+    border-radius: 11px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    background: #fafafa;
+    color: #1f1f1f;
+    font-family: inherit;
+    -webkit-appearance: none;
+}
+
+.auth-field input:focus,
+.auth-field__input-wrap input:focus {
+    border-color: #7c5cff;
+    box-shadow: 0 0 0 3.5px rgba(124, 92, 255, 0.13);
+    background: #fff;
+}
+
+.auth-field input::placeholder,
+.auth-field__input-wrap input::placeholder {
+    color: #c0c0cc;
+}
+
+/* Password field with eye toggle */
+.auth-field__input-wrap input[type="password"],
+.auth-field__input-wrap input[type="text"].is-password {
+    padding-right: 44px;
+}
+
+.auth-eye {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 44px;
+    width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #c0c0cc;
+    border-radius: 0 11px 11px 0;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+
+.auth-eye:hover { color: #7c5cff; }
+
+.auth-eye svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+/* ── Error banner ─────────────────────────────────────────────────────────── */
+
+.auth-error {
+    font-size: 13px;
+    color: #d9183a;
+    background: #fff2f4;
+    border: 1px solid #ffd6da;
+    border-radius: 10px;
+    padding: 11px 14px;
+    line-height: 1.45;
+    animation: auth-error-in 0.2s ease both;
+}
+
+@keyframes auth-error-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Submit button ────────────────────────────────────────────────────────── */
+
+.auth-submit {
+    height: 46px;
+    border: none;
+    border-radius: 11px;
+    background: linear-gradient(135deg, #7c5cff 0%, #9b7dff 100%);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 2px;
+    transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 16px rgba(124, 92, 255, 0.38);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: inherit;
+    letter-spacing: 0.1px;
+    width: 100%;
+}
+
+.auth-submit:hover:not(:disabled) {
+    opacity: 0.93;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px rgba(124, 92, 255, 0.44);
+}
+
+.auth-submit:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 3px 12px rgba(124, 92, 255, 0.30);
+}
+
+.auth-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ── Loading spinner ──────────────────────────────────────────────────────── */
+
+.auth-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2.5px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: auth-spin 0.65s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes auth-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Divider / footer hint ────────────────────────────────────────────────── */
+
+.auth-hint {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: #9a9aa3;
+}
+
+.auth-hint button {
+    background: none;
+    border: none;
+    color: #7c5cff;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0;
+    font-family: inherit;
+}
+
+.auth-hint button:hover { text-decoration: underline; }

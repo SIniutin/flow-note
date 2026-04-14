@@ -1,3 +1,5 @@
+// ─── src/editor/mention/mentionExtension.ts ──────────────────────────────────
+
 import { Extension } from "@tiptap/core";
 import { PluginKey } from "@tiptap/pm/state";
 import Suggestion, { type SuggestionOptions } from "@tiptap/suggestion";
@@ -12,13 +14,14 @@ export const MentionExtension = Extension.create({
                 char: "@",
                 startOfLine: false,
                 command: ({ editor, range, props }) => {
-                    const userId = (props as { id: string }).id;
+                    const user = props as { id: string; name: string };
                     editor
                         .chain()
                         .focus()
                         .deleteRange(range)
                         .insertContent([
-                            { type: "mention", attrs: { userId } },
+                            // Новые attrs по схеме: id, label, kind
+                            { type: "mention", attrs: { id: user.id, label: user.name, kind: "user" } },
                             { type: "text", text: " " },
                         ])
                         .run();
@@ -65,7 +68,7 @@ export const MentionExtension = Extension.create({
                                     .focus()
                                     .deleteRange(s.range)
                                     .insertContent([
-                                        { type: "mention", attrs: { userId: item.id } },
+                                        { type: "mention", attrs: { id: item.id, label: item.name, kind: "user" } },
                                         { type: "text", text: " " },
                                     ])
                                     .run();

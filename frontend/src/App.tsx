@@ -20,10 +20,12 @@ import {useCurrentUser, changeCurrentUser} from "./data/useCurrentUser";
 import {ToolbarRefContext, type ToolbarRefHandle} from "./editor/ToolbarRefContext";
 import {TablePickerModal} from "./editor/mwsTable/TablePickerModal";
 import {PresenceAvatars} from "./editor/collab/PresenceAvatars";
+import {EmojiPickerPopover} from "./editor/emoji/EmojiPickerPopover";
 
 export default function App() {
     const [loading, setLoading] = useState(true);
     const [imgOpen, setImgOpen] = useState(false);
+    const [stickerOpen, setStickerOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(true);
     const [composerOpen, setComposerOpen] = useState(false);
 
@@ -67,8 +69,7 @@ export default function App() {
             try {
                 dom = editor.view.dom as HTMLElement;
                 dom.addEventListener("click", onClick);
-            } catch { /* view не готов */
-            }
+            } catch { /* view не готов */ }
         };
         editor.on("create", attach);
         attach();
@@ -122,24 +123,41 @@ export default function App() {
 
     const handleInsertImage = useCallback(() => setImgOpen(true), []);
 
+    useEffect(() => {
+        const handler = () => setImgOpen(true);
+        window.addEventListener("wiki:open-image-modal", handler);
+        return () => window.removeEventListener("wiki:open-image-modal", handler);
+    }, []);
+
+    useEffect(() => {
+        const handler = () => setStickerOpen(true);
+        window.addEventListener("wiki:open-sticker-modal", handler);
+        return () => window.removeEventListener("wiki:open-sticker-modal", handler);
+    }, []);
+
     const handleImageModalClose = useCallback(() => {
         setImgOpen(false);
-        // Возвращаем фокус в редактор после закрытия модалки
+        setTimeout(() => editor?.commands.focus(), 50);
+    }, [editor]);
+
+    const handleStickerModalClose = useCallback(() => {
+        setStickerOpen(false);
         setTimeout(() => editor?.commands.focus(), 50);
     }, [editor]);
 
     const handleImageApply = useCallback(
-        (base64: string) => {
-            if (!editor) {
-                console.error("handleImageApply: editor is null");
-                return;
-            }
-            // Простая вставка без chain — надёжнее в Collaboration-режиме
-            const success = editor.chain()
+        (base64: string, mimeType: string, fileName: string) => {
+            if (!editor) return;
+            editor.chain()
                 .focus()
-                .setImage({src: base64})
+                .insertEmbedMedia({
+                    kind:      "image",
+                    src:       base64,
+                    mime_type: mimeType,
+                    file_name: fileName,
+                    alt:       fileName,
+                })
                 .run();
-            console.log("setImage result:", success);
         },
         [editor],
     );
@@ -173,9 +191,8 @@ export default function App() {
                 const node = domPos.node instanceof Element
                     ? domPos.node
                     : domPos.node.parentElement;
-                node?.scrollIntoView({behavior: "smooth", block: "center"});
-            } catch { /* view мог разрушиться */
-            }
+                node?.scrollIntoView({ behavior: "smooth", block: "center" });
+            } catch { /* view мог разрушиться */ }
         });
     }, [editor, setActiveThreadId]);
 
@@ -189,7 +206,7 @@ export default function App() {
 
     const tabs = (
         <>
-            <PresenceAvatars/>
+            <PresenceAvatars />
             <select
                 value={currentUser.id}
                 onChange={e => changeCurrentUser(e.target.value)}
@@ -248,6 +265,8 @@ export default function App() {
                 {loading ? <PageSkeleton/> : <EditorContent editor={editor}/>}
             </PageShell>
             <ImageModal open={imgOpen} onClose={handleImageModalClose} onApply={handleImageApply}/>
+            <ImageModal open={stickerOpen} onClose={handleStickerModalClose} onApply={handleImageApply} title="Вставить стикер"/>
+            <EmojiPickerPopover/>
             <SlashMenu/>
             <MentionMenu/>
             <TablePickerModal/>

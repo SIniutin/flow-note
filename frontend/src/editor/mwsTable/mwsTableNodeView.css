@@ -145,6 +145,30 @@
     white-space: nowrap;
 }
 
+.mws-node__th--more {
+    width: 36px;
+    text-align: center;
+}
+
+.mws-node__cols-expand {
+    all: unset;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-tertiary);
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    transition: background 0.1s, color 0.1s;
+}
+.mws-node__cols-expand:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.mws-node__td--more {
+    width: 36px;
+}
+
 .mws-node__td {
     padding: 5px var(--space-3);
     color: var(--text-primary);

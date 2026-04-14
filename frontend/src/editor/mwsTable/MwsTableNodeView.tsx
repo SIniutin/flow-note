@@ -5,15 +5,15 @@ import { NodeViewWrapper } from "@tiptap/react";
 import type { NodeViewProps } from "@tiptap/react";
 import { tablesClient } from "../../api/tablesClient";
 import { BacklinksChip } from "./BacklinksChip";
-import type { MwsTable, MwsTableNodeAttrs, MwsColumnType } from "../../types/mwsTable";
+import type { MwsTable, MwsColumnType } from "../../types/mwsTable";
 import "./mwsTableNodeView.css";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-const MODE_LABELS: Record<MwsTableNodeAttrs["viewMode"], string> = {
+const MODE_LABELS: Record<"compact"|"full"|"card", string> = {
     compact: "Compact",
     full: "Full",
-    card: "Card",
+    card: "Cards",
 };
 
 function formatCell(value: unknown, type: MwsColumnType): string {
@@ -68,13 +68,16 @@ function Skeleton({ width }: { width: number | string }) {
 // ── main component ────────────────────────────────────────────────────────────
 
 export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewProps) {
-    const attrs = node.attrs as MwsTableNodeAttrs;
-    const { tableId, viewMode, maxRows = 5, caption } = attrs;
+    const attrs = node.attrs;
+    const { dst_id: tableId, display, title: caption, maxRows = 5 } = attrs;
+    const viewMode: "compact" | "full" | "card" =
+        display === "cards" ? "card" : display === "full" ? "full" : "compact";
 
     const [table, setTable] = useState<MwsTable | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [expanded, setExpanded] = useState(false);
+    const [colsExpanded, setColsExpanded] = useState(false);
     const [modeMenuOpen, setModeMenuOpen] = useState(false);
 
     const modeMenuRef = useRef<HTMLDivElement>(null);
@@ -107,8 +110,10 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
         return () => document.removeEventListener("mousedown", handler);
     }, [modeMenuOpen]);
 
-    const handleModeChange = useCallback((mode: MwsTableNodeAttrs["viewMode"]) => {
-        updateAttributes({ viewMode: mode });
+    const handleModeChange = useCallback((mode: "compact" | "full" | "card") => {
+        const display = mode === "card" ? "cards" : mode === "full" ? "full" : "table";
+        updateAttributes({ display });
+        setColsExpanded(false);
         setModeMenuOpen(false);
     }, [updateAttributes]);
 
@@ -118,11 +123,14 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
         ? (expanded ? table.rows : table.rows.slice(0, maxRows))
         : [];
 
-    const visibleColumns = (
-        viewMode === "compact" && attrs.pinnedColumns?.length
-            ? (table?.columns.filter(c => attrs.pinnedColumns!.includes(c.id)) ?? [])
-            : (table?.columns ?? [])
-    );
+    const allColumns = table?.columns ?? [];
+    const COMPACT_COLS = 3;
+    const visibleColumns = (viewMode === "compact" && !colsExpanded)
+        ? allColumns.slice(0, COMPACT_COLS)
+        : allColumns;
+    const hiddenColCount = (viewMode === "compact" && !colsExpanded)
+        ? Math.max(0, allColumns.length - COMPACT_COLS)
+        : 0;
 
     const nodeClass = `mws-node${selected ? " is-selected" : ""}`;
 
@@ -209,7 +217,7 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
                 </button>
                 {modeMenuOpen && (
                     <div className="mws-node__mode-menu">
-                        {(Object.keys(MODE_LABELS) as MwsTableNodeAttrs["viewMode"][]).map(m => (
+                        {(Object.keys(MODE_LABELS) as ("compact"|"full"|"card")[]).map(m => (
                             <button
                                 key={m}
                                 className={`mws-node__mode-item${m === viewMode ? " is-active" : ""}`}
@@ -228,7 +236,7 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
 
     const foot = (
         <div className="mws-node__foot">
-            <BacklinksChip tableId={tableId} />
+            <BacklinksChip tableId={tableId ?? ""} />
             <span>
                 {table.rows.length} строк · {table.columns.length} колонок
             </span>
@@ -297,6 +305,28 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
                                     {col.name}
                                 </th>
                             ))}
+                            {hiddenColCount > 0 && (
+                                <th className="mws-node__th mws-node__th--more">
+                                    <button
+                                        className="mws-node__cols-expand"
+                                        onClick={e => { e.stopPropagation(); setColsExpanded(true); }}
+                                        title="Показать все колонки"
+                                    >
+                                        +{hiddenColCount}
+                                    </button>
+                                </th>
+                            )}
+                            {colsExpanded && viewMode === "compact" && (
+                                <th className="mws-node__th mws-node__th--more">
+                                    <button
+                                        className="mws-node__cols-expand"
+                                        onClick={e => { e.stopPropagation(); setColsExpanded(false); }}
+                                        title="Свернуть"
+                                    >
+                                        ←
+                                    </button>
+                                </th>
+                            )}
                         </tr>
                     </thead>
                     <tbody>
@@ -310,6 +340,7 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
                                         }
                                     </td>
                                 ))}
+                                {hiddenColCount > 0 && <td className="mws-node__td mws-node__td--more" />}
                             </tr>
                         ))}
                     </tbody>
