@@ -55,6 +55,42 @@ func (r *Repository) CreatePage(ctx context.Context, title string, ownerID uuid.
 	return &page, nil
 }
 
+// CreatePageWithPermission creates a page and the owner's permission record atomically.
+// If either INSERT fails the whole transaction is rolled back, preventing orphaned pages.
+func (r *Repository) CreatePageWithPermission(ctx context.Context, title string, ownerID uuid.UUID) (*domain.Page, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	const pageQuery = `
+		INSERT INTO pages (title, owner_id)
+		VALUES ($1, $2)
+		RETURNING id, title, owner_id, size, version, created_at, updated_at, deleted_at
+	`
+	var page domain.Page
+	if err := tx.QueryRow(ctx, pageQuery, title, ownerID).Scan(
+		&page.ID, &page.Title, &page.OwnerID, &page.Size, &page.Version,
+		&page.CreatedAt, &page.UpdatedAt, &page.DeletedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	const permQuery = `
+		INSERT INTO page_permissions (page_id, user_id, role)
+		VALUES ($1, $2, $3)
+	`
+	if _, err := tx.Exec(ctx, permQuery, page.ID, ownerID, string(perm.RoleOwner)); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return &page, nil
+}
+
 func (r *Repository) GetPage(ctx context.Context, pageID uuid.UUID) (*domain.Page, error) {
 	const query = `
 		SELECT id, title, owner_id, size, version, created_at, updated_at, deleted_at

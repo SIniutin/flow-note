@@ -1,70 +1,92 @@
 syntax = "proto3";
 
-package notify.v1;
-
-option go_package = "github.com/flow-note/api-contracts/generated/proto/notify/v1;notifyv1";
-
+package notifications.v1;
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
+
+option go_package = "gen/notifications/v1;notificationsv1";
+
 import "google/protobuf/timestamp.proto";
+import "buf/validate/validate.proto";
 
-service NotifyService {
-  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/notifications"
-    };
-  }
+enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_TYPE_MENTION_COMMENT = 1;
+  NOTIFICATION_TYPE_MENTION_PAGE    = 2;
+  NOTIFICATION_TYPE_COMMENT_THREAD  = 3;
+  NOTIFICATION_TYPE_COMMENT_REPLY   = 4;
+  NOTIFICATION_TYPE_COMMENT_MENTION = 5;
+}
 
-  rpc MarkRead(MarkReadRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/api/v1/notifications/{notification_id}:mark-read"
-      body: "*"
-    };
-  }
-
-  rpc MarkAllRead(MarkAllReadRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      post: "/api/v1/notifications:mark-all-read"
-      body: "*"
-    };
-  }
-
-  rpc NotificationStream(NotificationStreamRequest) returns (stream NotificationEvent);
+message NotificationPayload {
+  optional string entity_id = 1 [(buf.validate.field).string.uuid = true];
+  string page_id = 2 [(buf.validate.field).string.uuid = true];
 }
 
 message Notification {
-  string id = 1;
-  string user_id = 2;
-  string type = 3;
-  optional string actor_user_id = 4;
-  optional string page_id = 5;
-  optional string thread_id = 6;
-  optional string comment_id = 7;
-  string payload_json = 8;
-  bool read = 9;
-  google.protobuf.Timestamp created_at = 10;
-  google.protobuf.Timestamp read_at = 11;
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string user_id = 2 [(buf.validate.field).string.uuid = true];
+  NotificationType type = 3 [
+    (buf.validate.field).enum.defined_only = true,
+    (buf.validate.field).enum.not_in = 0];
+
+  optional string actor_user_id = 4 [
+    (buf.validate.field).string.uuid = true
+  ];
+
+  NotificationPayload payload = 6 [(buf.validate.field).required = true];
+
+  google.protobuf.Timestamp created_at = 7 [(buf.validate.field).required = true];
+  optional google.protobuf.Timestamp read_at      = 8;
+  optional google.protobuf.Timestamp cancelled_at = 9;
 }
 
-message ListNotificationsRequest {
-  bool unread_only = 1;
-  bool only_mentions = 2;
-  int32 limit = 3;
-  int32 offset = 4;
+
+message GetNotificationsRequest {
+  optional int32  page_size = 3 [
+    (buf.validate.field).int32.gte = 1,
+    (buf.validate.field).int32.lte = 100
+  ];
+  optional bool unread_only = 4;
 }
 
-message ListNotificationsResponse {
-  repeated Notification items = 1;
+message GetNotificationsResponse {
+  repeated Notification notifications = 1;
 }
 
 message MarkReadRequest {
-  string notification_id = 1;
+  string notification_id = 2 [
+    (buf.validate.field).string.uuid = true
+  ];
 }
 
-message MarkAllReadRequest {}
 
-message NotificationStreamRequest {}
+message MarkAllReadRequest {
+  optional google.protobuf.Timestamp before = 2;
+}
 
-message NotificationEvent {
-  Notification notification = 1;
+//
+service NotificationService {
+  //
+  rpc GetNotifications   (GetNotificationsRequest) returns (GetNotificationsResponse) {
+    option (google.api.http) = {
+      get: "/v1/notify"
+    };
+  };
+  //
+  rpc MarkRead           (MarkReadRequest)         returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/notifications/{notification_id}/read"
+      body: "*"
+    };
+  };
+  //
+  rpc MarkAllRead        (MarkAllReadRequest)      returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/notifications:readAll" 
+      body: "*"
+    };
+  };
+  //
+  rpc StreamNotification (google.protobuf.Empty)        returns (stream Notification);
 }

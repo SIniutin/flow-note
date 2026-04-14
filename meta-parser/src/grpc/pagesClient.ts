@@ -62,17 +62,23 @@ function unaryCall(method: string, payload: object): Promise<void> {
 
 /**
  * Синхронизирует извлечённые из snapshot связи страницы с pages-service.
- * Пока отправляем только таблицы; links/mentions/media идут пустыми replace-запросами.
+ * Сейчас отправляем links, mentions и tables; media пока остаётся пустым replace-запросом.
  */
 export async function replacePageRelations(pageId: string, meta: PageMetadata): Promise<void> {
   await Promise.all([
     unaryCall("ReplacePageLinks", {
       page_id: pageId,
-      links: [],
+      links: meta.links.map((link) => ({
+        to_page_id: link.toPageId,
+        block_id: link.blockId,
+      })),
     }),
     unaryCall("ReplacePageMentions", {
       page_id: pageId,
-      mentions: [],
+      mentions: meta.mentions.map((mention) => ({
+        user_id: mention.userId,
+        block_id: mention.blockId,
+      })),
     }),
     unaryCall("ReplacePageTables", {
       page_id: pageId,

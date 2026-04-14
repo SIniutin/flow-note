@@ -4,31 +4,34 @@ import (
 	"context"
 
 	notifyv1 "github.com/flow-note/api-contracts/generated/proto/notify/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type Server struct {
-	notifyv1.UnimplementedNotifyServiceServer
+	notifyv1.UnimplementedNotificationServiceServer
 }
 
 func New() *Server {
 	return &Server{}
 }
 
-func (s *Server) ListNotifications(_ context.Context, _ *notifyv1.ListNotificationsRequest) (*notifyv1.ListNotificationsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+func (s *Server) GetNotifications(ctx context.Context, req *notifyv1.GetNotificationsRequest) (*notifyv1.GetNotificationsResponse, error) {
+	req.ValidateAll()
+
 }
 
-func (s *Server) MarkRead(_ context.Context, _ *notifyv1.MarkReadRequest) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+func (s *Server) MarkRead(ctx context.Context, req *notifyv1.MarkReadRequest) (*emptypb.Empty, error) {
+	req.ValidateAll()
+
+	return &emptypb.Empty{}, nil
 }
 
-func (s *Server) MarkAllRead(_ context.Context, _ *notifyv1.MarkAllReadRequest) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "not implemented")
+func (s *Server) MarkAllRead(ctx context.Context, req *notifyv1.MarkAllReadRequest) (*emptypb.Empty, error) {
+	req.ValidateAll()
+
+	return &emptypb.Empty{}, nil
 }
 
-func (s *Server) NotificationStream(_ *notifyv1.NotificationStreamRequest, _ notifyv1.NotifyService_NotificationStreamServer) error {
-	return status.Error(codes.Unimplemented, "not implemented")
+func (s *Server) NotificationStream(ctx *emptypb.Empty, req notifyv1.NotificationService_StreamNotificationServer) error {
+
 }

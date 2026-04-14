@@ -7,6 +7,7 @@ type Config struct {
 	AuthGRPCAddr    string
 	CollabGRPCAddr  string
 	CommentGRPCAddr string
+	MediaGRPCAddr   string
 	PagesGRPCAddr   string
 	NotifyGRPCAddr  string
 	CollabAddr      string
@@ -25,6 +26,7 @@ func LoadConfig() Config {
 	v.SetDefault("AUTH_GRPC_ADDR",    "127.0.0.1:50052")
 	v.SetDefault("COLLAB_GRPC_ADDR",  "127.0.0.1:50053")
 	v.SetDefault("COMMENT_GRPC_ADDR", "127.0.0.1:9091")
+	v.SetDefault("MEDIA_GRPC_ADDR",   "127.0.0.1:50054")
 	v.SetDefault("PAGES_GRPC_ADDR",   "127.0.0.1:50055")
 	v.SetDefault("NOTIFY_GRPC_ADDR",  "127.0.0.1:9092")
 	v.SetDefault("COLLAB_ADDR",       "127.0.0.1:4000")
@@ -39,6 +41,7 @@ func LoadConfig() Config {
 		AuthGRPCAddr:    v.GetString("AUTH_GRPC_ADDR"),
 		CollabGRPCAddr:  v.GetString("COLLAB_GRPC_ADDR"),
 		CommentGRPCAddr: v.GetString("COMMENT_GRPC_ADDR"),
+		MediaGRPCAddr:   v.GetString("MEDIA_GRPC_ADDR"),
 		PagesGRPCAddr:   v.GetString("PAGES_GRPC_ADDR"),
 		NotifyGRPCAddr:  v.GetString("NOTIFY_GRPC_ADDR"),
 		CollabAddr:      v.GetString("COLLAB_ADDR"),

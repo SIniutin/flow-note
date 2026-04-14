@@ -19,6 +19,7 @@ import (
 	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
 	collabpb "github.com/flow-note/api-contracts/generated/proto/collab/v1"
 	commentpb "github.com/flow-note/api-contracts/generated/proto/comment/v1"
+	mediapb "github.com/flow-note/api-contracts/generated/proto/media/v1"
 	sec "github.com/flow-note/common/authsecurity"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -34,6 +35,10 @@ type fakeCollabTableServer struct {
 
 type fakeCommentServer struct {
 	commentpb.UnimplementedCommentServiceServer
+}
+
+type fakeMediaServer struct {
+	mediapb.UnimplementedMediaServiceServer
 }
 
 func (s *fakeAuthServer) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.AuthResponse, error) {
@@ -108,10 +113,27 @@ func (s *fakeCommentServer) GetComment(ctx context.Context, req *commentpb.GetCo
 	}, nil
 }
 
+func (s *fakeMediaServer) GetLatestSnapshotDownloadUrl(ctx context.Context, req *mediapb.GetLatestSnapshotDownloadUrlRequest) (*mediapb.GetLatestSnapshotDownloadUrlResponse, error) {
+	return &mediapb.GetLatestSnapshotDownloadUrlResponse{DownloadUrl: "http://example.com/latest"}, nil
+}
+
+func (s *fakeMediaServer) GetSnapshotDownloadUrl(ctx context.Context, req *mediapb.GetSnapshotDownloadUrlRequest) (*mediapb.GetSnapshotDownloadUrlResponse, error) {
+	return &mediapb.GetSnapshotDownloadUrlResponse{DownloadUrl: "http://example.com/snapshot"}, nil
+}
+
+func (s *fakeMediaServer) GetMediaDownloadUrl(ctx context.Context, req *mediapb.GetMediaDownloadUrlRequest) (*mediapb.GetMediaDownloadUrlResponse, error) {
+	return &mediapb.GetMediaDownloadUrlResponse{DownloadUrl: "http://example.com/media"}, nil
+}
+
+func (s *fakeMediaServer) GetMediaUploadUrl(ctx context.Context, req *mediapb.GetMediaUploadUrlRequest) (*mediapb.GetMediaUploadUrlResponse, error) {
+	return &mediapb.GetMediaUploadUrlResponse{UploadUrl: "http://example.com/upload", MediaId: "media-1"}, nil
+}
+
 func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 	authAddr := startAuthTestGRPCServer(t)
 	collabAddr := startCollabTestGRPCServer(t)
 	commentAddr := startCommentTestGRPCServer(t)
+	mediaAddr := startMediaTestGRPCServer(t)
 	keyPath, _ := createGatewayTestKeyPair(t)
 	httpAddr := freeTCPAddr(t)
 
@@ -123,6 +145,7 @@ func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 		AuthGRPCAddr:  authAddr,
 		CollabGRPCAddr: collabAddr,
 		CommentGRPCAddr: commentAddr,
+		MediaGRPCAddr: mediaAddr,
 		CollabAddr:    "127.0.0.1:4000",
 		PublicKeyPath: keyPath,
 		JWTIssuer:     "todo-auth",
@@ -213,6 +236,20 @@ func startCommentTestGRPCServer(t *testing.T) string {
 	}
 	srv := grpc.NewServer()
 	commentpb.RegisterCommentServiceServer(srv, &fakeCommentServer{})
+	go func() { _ = srv.Serve(lis) }()
+	t.Cleanup(srv.Stop)
+	return lis.Addr().String()
+}
+
+func startMediaTestGRPCServer(t *testing.T) string {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		skipIfListenForbidden(t, err)
+		t.Fatalf("listen media grpc: %v", err)
+	}
+	srv := grpc.NewServer()
+	mediapb.RegisterMediaServiceServer(srv, &fakeMediaServer{})
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(srv.Stop)
 	return lis.Addr().String()

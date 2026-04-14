@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,37 +13,25 @@ const (
 	NotificationCommentReply   = "comment.reply"
 )
 
-// Notification is a single notification record stored in the database.
+type NotificationType string
+
+const (
+	NOTIFICATION_TYPE_UNSPECIFIED     NotificationType = "unspecified"
+	NOTIFICATION_TYPE_MENTION_COMMENT NotificationType = "comment_mention"
+	NOTIFICATION_TYPE_MENTION_PAGE    NotificationType = "page_mention"
+	NOTIFICATION_TYPE_COMMENT_THREAD  NotificationType = "comment_thread"
+	NOTIFICATION_TYPE_COMMENT_REPLY   NotificationType = "comment_reply"
+	NOTIFICATION_TYPE_COMMENT_MENTION NotificationType = "comment_mention"
+)
+
 type Notification struct {
 	ID          uuid.UUID
 	UserID      uuid.UUID
-	Type        string
+	Type        NotificationType
 	ActorUserID *uuid.UUID
 	PageID      *uuid.UUID
-	ThreadID    *uuid.UUID
 	CommentID   *uuid.UUID
-	Payload     json.RawMessage
-	DedupeKey   *string
-	CreatedAt   time.Time
 	ReadAt      *time.Time
 	CancelledAt *time.Time
-}
-
-// ProcessedEvent tracks event idempotency — used to prevent duplicate notifications.
-type ProcessedEvent struct {
-	EventID     uuid.UUID
-	EventType   string
-	ProcessedAt time.Time
-}
-
-// RealtimeMessage is published to Redis so connected clients receive live notifications.
-type RealtimeMessage struct {
-	NotificationID uuid.UUID       `json:"notification_id"`
-	UserID         uuid.UUID       `json:"user_id"`
-	Type           string          `json:"type"`
-	PageID         *uuid.UUID      `json:"page_id,omitempty"`
-	ThreadID       *uuid.UUID      `json:"thread_id,omitempty"`
-	CommentID      *uuid.UUID      `json:"comment_id,omitempty"`
-	Payload        json.RawMessage `json:"payload,omitempty"`
-	CreatedAt      time.Time       `json:"created_at"`
+	CreatedAt   time.Time
 }

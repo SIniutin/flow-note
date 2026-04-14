@@ -8,6 +8,7 @@ import (
 	authpb    "github.com/flow-note/api-contracts/generated/proto/auth/v1"
 	collabpb  "github.com/flow-note/api-contracts/generated/proto/collab/v1"
 	commentpb "github.com/flow-note/api-contracts/generated/proto/comment/v1"
+	mediapb   "github.com/flow-note/api-contracts/generated/proto/media/v1"
 	notifypb  "github.com/flow-note/api-contracts/generated/proto/notify/v1"
 	pagespb   "github.com/flow-note/api-contracts/generated/proto/page/v1"
 	"github.com/flow-note/api-gateway/internal/handlers"
@@ -80,6 +81,10 @@ func (a *App) Run(ctx context.Context) error {
 		logger.Error("failed to register comment service", zap.Error(err))
 		return err
 	}
+	if err := mediapb.RegisterMediaServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.MediaGRPCAddr, dialOpts); err != nil {
+		logger.Error("failed to register media service", zap.Error(err))
+		return err
+	}
 	if err := pagespb.RegisterPagesServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.PagesGRPCAddr, dialOpts); err != nil {
 		logger.Error("failed to register pages service", zap.Error(err))
 		return err
@@ -95,6 +100,7 @@ func (a *App) Run(ctx context.Context) error {
 		logger.Error("failed to create permission cache", zap.Error(err))
 		return err
 	}
+	defer permCache.Close()
 
 	// ── Request mux ──────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
@@ -121,6 +127,7 @@ func (a *App) Run(ctx context.Context) error {
 	})
 
 	var handler http.Handler = root
+	handler = middleware.RateLimit(5, 10)(handler)
 	handler = middleware.Cors(a.cfg.AllowedOrigin)(handler)
 	handler = middleware.RequestLog(logger)(handler)
 	handler = cr.RecoveryMiddleware(logger)(handler)
@@ -130,6 +137,7 @@ func (a *App) Run(ctx context.Context) error {
 		zap.String("auth_grpc",      a.cfg.AuthGRPCAddr),
 		zap.String("pages_grpc",     a.cfg.PagesGRPCAddr),
 		zap.String("comment_grpc",   a.cfg.CommentGRPCAddr),
+		zap.String("media_grpc",     a.cfg.MediaGRPCAddr),
 		zap.String("notify_grpc",    a.cfg.NotifyGRPCAddr),
 		zap.String("collab_grpc",    a.cfg.CollabGRPCAddr),
 		zap.String("collab_ws",      a.cfg.CollabAddr),

@@ -17,6 +17,7 @@ import (
 
 	pb "github.com/flow-note/api-contracts/generated/proto/page/v1"
 	"github.com/flow-note/common/grpcauth"
+	cr "github.com/flow-note/common/runtime"
 	"github.com/flow-note/page-service/internal/handler"
 	"github.com/flow-note/page-service/internal/repository"
 	"github.com/flow-note/page-service/internal/usecase"
@@ -49,9 +50,12 @@ func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, erro
 	verifier := authsecurity.NewRS256Verifier(key, cfg.JWT.Issuer, cfg.JWT.Audience)
 
 	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{
-			// TODO: make from config
-		})),
+		grpc.ChainUnaryInterceptor(
+			cr.RecoveryUnaryServerInterceptor(logger),
+			grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{
+				// TODO: make from config
+			}),
+		),
 	)
 
 	repo := repository.NewRepository(dbPool)

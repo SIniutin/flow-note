@@ -12,26 +12,17 @@ import (
 	"github.com/flow-note/page-service/internal/domain"
 )
 
-// TODO: transaction here
 
 func (s *Service) CreatePage(ctx context.Context, ownerId uuid.UUID, title string) (*domain.Page, error) {
 	title = strings.TrimSpace(title)
 
-	page, err := s.pageRepo.CreatePage(ctx, title, ownerId)
+	page, err := s.pageRepo.CreatePageWithPermission(ctx, title, ownerId)
 	if err != nil {
-		s.logger.Error("CreatePage repository error",
+		s.logger.Error("CreatePage error",
 			zap.String("owner_id", ownerId.String()),
 			zap.String("title", title),
 			zap.Error(err),
 		)
-		return nil, err
-	}
-
-	_, err = s.permissionRepo.CreatePermission(ctx, page.ID, ownerId, perm.RoleOwner)
-	if err != nil {
-		s.logger.Error("CreatePage permission error",
-			zap.String("owner_id", ownerId.String()),
-			zap.String("title", title))
 		return nil, err
 	}
 

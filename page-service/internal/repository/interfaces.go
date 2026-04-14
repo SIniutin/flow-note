@@ -10,6 +10,8 @@ import (
 )
 
 type PageRepository interface {
+	// CreatePageWithPermission creates a page and grants the owner role in a single transaction.
+	CreatePageWithPermission(ctx context.Context, title string, ownerID uuid.UUID) (*domain.Page, error)
 	CreatePage(ctx context.Context, title string, ownerID uuid.UUID) (*domain.Page, error)
 	GetPage(ctx context.Context, pageID uuid.UUID) (*domain.Page, error)
 	UpdatePage(ctx context.Context, pageID uuid.UUID, title string, size int64, versionId int64) (*domain.Page, error)

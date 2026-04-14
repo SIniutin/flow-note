@@ -39,7 +39,9 @@ async function processEvent(event: SnapshotUploadedEvent): Promise<void> {
   console.log(`[worker] downloaded  page=${page_id}  bytes=${blob.byteLength}`);
 
   const meta = parseSnapshot(blob);
-  console.log(`[worker] parsed  page=${page_id}  title="${meta.title}"  words=${meta.wordCount}  tables=[${meta.tables.map((table) => table.dstId).join(", ")}]`);
+  console.log(
+    `[worker] parsed  page=${page_id}  title="${meta.title}"  words=${meta.wordCount}  links=${meta.links.length}  mentions=${meta.mentions.length}  tables=[${meta.tables.map((table) => table.dstId).join(", ")}]`
+  );
 
   await replacePageRelations(page_id, meta);
   console.log(`[worker] ReplacePageRelations OK  page=${page_id}`);

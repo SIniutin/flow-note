@@ -22,7 +22,7 @@ service PagesService {
       get: "/v1/pages/{page_id}"
     };
   }
-  rpc UpdatePage(UpdatePageRequest) returns (UpdatePageResponse);
+  
   rpc DeletePage(DeletePageRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {
       delete: "/v1/pages/{page_id}"
@@ -68,12 +68,7 @@ service PagesService {
       delete: "/v1/pages/{page_id}/permissions/{user_id}"
     };
   }
-  rpc UpdatePagePermission(UpdatePagePermissionRequest) returns (google.protobuf.Empty) {
-    option (google.api.http) = {
-      patch: "/v1/pages/{page_id}/permissions/{user_id}"
-      body: "*"
-    };
-  }
+
   rpc ListPagePermissions(ListPagePermissionsRequest) returns (ListPagePermissionsResponse) {
     option (google.api.http) = {
       get: "/v1/pages/{page_id}/permissions"
@@ -209,17 +204,6 @@ message GetPageRequest {
 }
 
 message GetPageResponse {
-  Page page = 1;
-}
-
-message UpdatePageRequest {
-  string page_id = 1 [(validate.rules).string.uuid = true];
-  string title = 2 [(validate.rules).string = {min_len: 1, max_len: 512}];
-  int64 size = 3 [(validate.rules).int64 = {gte: 0}];
-  string key_to_snapshot = 4 [(validate.rules).string = {min_len: 1, max_len:32}];
-}
-
-message UpdatePageResponse {
   Page page = 1;
 }
 

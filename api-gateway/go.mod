@@ -7,6 +7,7 @@ replace github.com/flow-note/api-contracts => ../api-contracts
 replace github.com/flow-note/common => ../common
 
 require (
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
 	github.com/flow-note/api-contracts v0.0.0-00010101000000-000000000000
 	github.com/flow-note/common v0.0.0-00010101000000-000000000000
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
@@ -22,6 +23,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 )
 
 require (

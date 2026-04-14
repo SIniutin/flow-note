@@ -42,7 +42,8 @@ services:
       /bin/sh -c "
         mc alias set local http://minio:9000 minioadmin minioadmin &&
         mc mb --ignore-existing local/snapshots &&
-        echo '[minio-init] bucket snapshots ready'
+        mc mb --ignore-existing local/media &&
+        echo '[minio-init] buckets snapshots and media ready'
       "
     restart: "no"
 
@@ -295,6 +296,42 @@ services:
       postgres-pages:
         condition: service_healthy
 
+  # ── Media Service ───────────────────────────────────────────────────────────
+  media-service:
+    build:
+      context: .
+      dockerfile: media-service/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "50054"
+      - "8082"
+    environment:
+      GRPC_PORT: "50054"
+      HTTP_PORT: "8082"
+      MINIO_HOST: "minio"
+      MINIO_PORT: "9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+      MINIO_BUCKET_NAME: "media"
+      MINIO_USE_SSL: "false"
+      MINIO_URL_TTL: "15m"
+      JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
+      JWT_ISSUER: "flow-note-auth"
+      JWT_AUDIENCE: "flow-note-api"
+    secrets:
+      - jwt_public_key
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/healthz | grep -q ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
   # ── Comment Service ───────────────────────────────────────────────────────────
   comment-service:
     build:
@@ -377,6 +414,7 @@ services:
       PAGES_GRPC_ADDR:   "page-service:50055"
       COMMENT_GRPC_ADDR: "comment-service:9091"
       NOTIFY_GRPC_ADDR:  "notify-service:9092"
+      MEDIA_GRPC_ADDR:   "media-service:50054"
       COLLAB_GRPC_ADDR:  "collab-service:50053"
       COLLAB_ADDR:       "collab-service:4000"
       JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
@@ -397,6 +435,8 @@ services:
         condition: service_started
       notify-service:
         condition: service_started
+      media-service:
+        condition: service_healthy
       collab-service:
         condition: service_healthy
 
