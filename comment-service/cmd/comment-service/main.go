@@ -16,20 +16,20 @@ func main() {
 	defer stop()
 
 	cfg := config.Load()
-	application, err := app.New(ctx, cfg)
+	application, err := app.New(cfg)
 	if err != nil {
 		panic(err)
 	}
 	defer application.Close()
 
 	go func() {
-		if err := application.GRPCServer.Serve(); err != nil {
+		if err := application.Serve(); err != nil {
 			application.Logger.Error("grpc server failed", zap.Error(err))
 			stop()
 		}
 	}()
 
 	<-ctx.Done()
-	application.GRPCServer.GracefulStop()
+	application.GracefulStop()
 	os.Exit(0)
 }

@@ -1,41 +1,54 @@
 package authctx
 
-import (
-	"context"
+import "context"
 
-	"github.com/google/uuid"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-)
+type key struct{}
 
-type ctxKey struct{}
-
-func WithUserID(ctx context.Context, id uuid.UUID) context.Context {
-	return context.WithValue(ctx, ctxKey{}, id)
+type AuthInfo struct {
+	UserID string
+	Role   string
 }
 
-// UserID returns the authenticated user ID stored in ctx by UnaryServerInterceptor.
-func UserID(ctx context.Context) (uuid.UUID, bool) {
-	id, ok := ctx.Value(ctxKey{}).(uuid.UUID)
-	return id, ok && id != uuid.Nil
+func WithAuthInfo(ctx context.Context, info AuthInfo) context.Context {
+	return context.WithValue(ctx, key{}, info)
 }
 
-// UnaryServerInterceptor extracts "x-user-id" from incoming gRPC metadata
-// and stores it in the request context via WithUserID.
-func UnaryServerInterceptor() grpc.UnaryServerInterceptor {
-	return func(
-		ctx context.Context,
-		req interface{},
-		_ *grpc.UnaryServerInfo,
-		handler grpc.UnaryHandler,
-	) (interface{}, error) {
-		if md, ok := metadata.FromIncomingContext(ctx); ok {
-			if vals := md.Get("x-user-id"); len(vals) > 0 {
-				if id, err := uuid.Parse(vals[0]); err == nil {
-					ctx = WithUserID(ctx, id)
-				}
-			}
-		}
-		return handler(ctx, req)
+func AuthInfoFromContext(ctx context.Context) (AuthInfo, bool) {
+	v := ctx.Value(key{})
+	info, ok := v.(AuthInfo)
+	return info, ok
+}
+
+func WithUserID(ctx context.Context, id string) context.Context {
+	info, _ := AuthInfoFromContext(ctx)
+	info.UserID = id
+	return WithAuthInfo(ctx, info)
+}
+
+func UserID(ctx context.Context) (string, bool) {
+	info, ok := AuthInfoFromContext(ctx)
+	if !ok {
+		return "", false
 	}
+	if info.UserID == "" {
+		return "", false
+	}
+	return info.UserID, true
+}
+
+func WithRole(ctx context.Context, role string) context.Context {
+	info, _ := AuthInfoFromContext(ctx)
+	info.Role = role
+	return WithAuthInfo(ctx, info)
+}
+
+func Role(ctx context.Context) (string, bool) {
+	info, ok := AuthInfoFromContext(ctx)
+	if !ok {
+		return "", false
+	}
+	if info.Role == "" {
+		return "", false
+	}
+	return info.Role, true
 }

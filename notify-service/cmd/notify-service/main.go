@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,28 +14,22 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
 	cfg := config.Load()
-	application, err := app.New(ctx, cfg)
+	application, err := app.New(cfg)
 	if err != nil {
 		panic(err)
 	}
 	defer application.Close()
 
 	go func() {
-		if err := application.Consumer.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			application.Logger.Error("consumer failed", zap.Error(err))
-			stop()
-		}
-	}()
-
-	go func() {
-		if err := application.GRPCServer.Serve(); err != nil {
+		if err := application.Serve(); err != nil {
 			application.Logger.Error("grpc server failed", zap.Error(err))
 			stop()
 		}
 	}()
 
 	<-ctx.Done()
-	application.GRPCServer.GracefulStop()
+	application.GracefulStop()
 	os.Exit(0)
 }

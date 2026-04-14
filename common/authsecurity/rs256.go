@@ -11,6 +11,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type AccessClaims struct {
+	Role string `json:"role"`
+	jwt.RegisteredClaims
+}
+
 type rs256Issuer struct {
 	privateKey *rsa.PrivateKey
 	issuer     string
@@ -29,16 +34,19 @@ func NewRS256Issuer(priv *rsa.PrivateKey, issuer, audience string, ttl time.Dura
 	}
 }
 
-func (i *rs256Issuer) NewAccess(userID string) (string, time.Time, error) {
+func (i *rs256Issuer) NewAccess(userID string, role string) (string, time.Time, error) {
 	now := time.Now()
 	exp := now.Add(i.ttl)
 
-	claims := jwt.RegisteredClaims{
-		Subject:   userID,
-		Issuer:    i.issuer,
-		Audience:  jwt.ClaimStrings{i.audience},
-		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(exp),
+	claims := AccessClaims{
+		Role: role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
+			Issuer:    i.issuer,
+			Audience:  jwt.ClaimStrings{i.audience},
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(exp),
+		},
 	}
 
 	t := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
@@ -78,7 +86,7 @@ func NewRS256Verifier(pub *rsa.PublicKey, issuer, audience string) *rs256Verifie
 	return &rs256Verifier{publicKey: pub, issuer: issuer, audience: audience}
 }
 
-func (v *rs256Verifier) VerifyAccess(tokenStr string) (userID string, err error) {
+func (v *rs256Verifier) VerifyAccess(tokenStr string) (userID string, role string, err error) {
 	parser := jwt.NewParser(
 		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Alg()}),
 		jwt.WithIssuer(v.issuer),
@@ -86,17 +94,20 @@ func (v *rs256Verifier) VerifyAccess(tokenStr string) (userID string, err error)
 		jwt.WithLeeway(30*time.Second),
 	)
 
-	var claims jwt.RegisteredClaims
+	var claims AccessClaims
 	_, err = parser.ParseWithClaims(tokenStr, &claims, func(t *jwt.Token) (any, error) {
 		return v.publicKey, nil
 	})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if claims.Subject == "" {
-		return "", errors.New("missing sub")
+		return "", "", errors.New("missing sub")
+	}
+	if claims.Role == "" {
+		return "", "", errors.New("missing role")
 	}
 
-	return claims.Subject, nil
+	return claims.Subject, claims.Role, nil
 }
