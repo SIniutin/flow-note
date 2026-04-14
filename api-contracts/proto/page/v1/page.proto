@@ -369,8 +369,9 @@ message ListPageTablesResponse {
 }
 
 message PageMediaInput {
-  MediaType type = 1 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
-  string block_id = 2 [(validate.rules).string.uuid = true];
+  string media_id = 1 [(validate.rules).string.uuid = true];
+  MediaType type = 2 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+  string block_id = 3 [(validate.rules).string.uuid = true];
 }
 
 message ReplacePageMediaRequest {

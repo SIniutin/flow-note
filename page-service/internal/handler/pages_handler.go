@@ -509,6 +509,7 @@ func (h *pagesHandler) ReplacePageMedia(ctx context.Context, req *pagesv1.Replac
 	media := make([]domain.PageMediaInput, 0, len(req.GetMedia()))
 	for _, item := range req.GetMedia() {
 		media = append(media, domain.PageMediaInput{
+			MediaID: mustParseUUID(item.GetMediaId()),
 			Type:    mediaTypeFromProto(item.GetType()),
 			BlockID: mustParseUUID(item.GetBlockId()),
 		})

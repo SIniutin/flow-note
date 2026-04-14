@@ -630,13 +630,13 @@ func (r *Repository) ReplaceMediasByPageID(ctx context.Context, pageID uuid.UUID
 
 		rows := make([][]any, 0, len(media))
 		for _, medium := range media {
-			rows = append(rows, []any{pageID, string(medium.Type), medium.BlockID})
+			rows = append(rows, []any{pageID, medium.MediaID, string(medium.Type), medium.BlockID})
 		}
 
 		_, err := tx.CopyFrom(
 			ctx,
 			pgx.Identifier{"page_media"},
-			[]string{"page_id", "type", "block_id"},
+			[]string{"page_id", "media_id", "type", "block_id"},
 			pgx.CopyFromRows(rows),
 		)
 		if err != nil {

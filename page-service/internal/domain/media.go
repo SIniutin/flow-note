@@ -20,6 +20,7 @@ type Media struct {
 }
 
 type PageMediaInput struct {
+	MediaID uuid.UUID
 	Type    MediaType
 	BlockID uuid.UUID
 }
