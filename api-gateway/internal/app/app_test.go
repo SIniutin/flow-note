@@ -18,6 +18,7 @@ import (
 
 	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
 	collabpb "github.com/flow-note/api-contracts/generated/proto/collab/v1"
+	commentpb "github.com/flow-note/api-contracts/generated/proto/comment/v1"
 	sec "github.com/flow-note/common/authsecurity"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -29,6 +30,10 @@ type fakeAuthServer struct {
 
 type fakeCollabTableServer struct {
 	collabpb.UnimplementedCollabTableServiceServer
+}
+
+type fakeCommentServer struct {
+	commentpb.UnimplementedCommentServiceServer
 }
 
 func (s *fakeAuthServer) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.AuthResponse, error) {
@@ -74,9 +79,39 @@ func (s *fakeCollabTableServer) GetTableView(ctx context.Context, req *collabpb.
 	}, nil
 }
 
+func (s *fakeCommentServer) MakeComment(ctx context.Context, req *commentpb.CreateCommentRequest) (*commentpb.CreateCommentResponce, error) {
+	return &commentpb.CreateCommentResponce{
+		Comment: &commentpb.Comment{
+			Id:     "comment-1",
+			UserId: req.GetUserId(),
+			PageId: req.GetPageId(),
+			Body:   req.GetBody(),
+		},
+	}, nil
+}
+
+func (s *fakeCommentServer) SubscribeToComment(ctx context.Context, req *commentpb.SubscribeToCommentRequest) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+
+func (s *fakeCommentServer) UnsubscribeToComment(ctx context.Context, req *commentpb.UnsubscribeToCommentRequest) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+
+func (s *fakeCommentServer) ListComments(ctx context.Context, req *commentpb.ListCommentsRequest) (*commentpb.ListCommentsResponse, error) {
+	return &commentpb.ListCommentsResponse{}, nil
+}
+
+func (s *fakeCommentServer) GetComment(ctx context.Context, req *commentpb.GetCommentRequest) (*commentpb.GetCommentResponce, error) {
+	return &commentpb.GetCommentResponce{
+		Comment: &commentpb.Comment{Id: req.GetCommentId()},
+	}, nil
+}
+
 func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 	authAddr := startAuthTestGRPCServer(t)
 	collabAddr := startCollabTestGRPCServer(t)
+	commentAddr := startCommentTestGRPCServer(t)
 	keyPath, _ := createGatewayTestKeyPair(t)
 	httpAddr := freeTCPAddr(t)
 
@@ -87,6 +122,7 @@ func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 		HTTPAddr:      httpAddr,
 		AuthGRPCAddr:  authAddr,
 		CollabGRPCAddr: collabAddr,
+		CommentGRPCAddr: commentAddr,
 		CollabAddr:    "127.0.0.1:4000",
 		PublicKeyPath: keyPath,
 		JWTIssuer:     "todo-auth",
@@ -163,6 +199,20 @@ func startCollabTestGRPCServer(t *testing.T) string {
 	}
 	srv := grpc.NewServer()
 	collabpb.RegisterCollabTableServiceServer(srv, &fakeCollabTableServer{})
+	go func() { _ = srv.Serve(lis) }()
+	t.Cleanup(srv.Stop)
+	return lis.Addr().String()
+}
+
+func startCommentTestGRPCServer(t *testing.T) string {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		skipIfListenForbidden(t, err)
+		t.Fatalf("listen comment grpc: %v", err)
+	}
+	srv := grpc.NewServer()
+	commentpb.RegisterCommentServiceServer(srv, &fakeCommentServer{})
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(srv.Stop)
 	return lis.Addr().String()

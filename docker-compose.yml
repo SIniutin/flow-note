@@ -347,6 +347,7 @@ services:
       GATEWAY_ADDR: ":8080"
       AUTH_GRPC_ADDR: "auth-service:50052"
       COLLAB_GRPC_ADDR: "collab-service:50053"
+      COMMENT_GRPC_ADDR: "comment-service:9091"
       COLLAB_ADDR: "collab-service:4000"
       JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
       JWT_ISSUER: "flow-note-auth"

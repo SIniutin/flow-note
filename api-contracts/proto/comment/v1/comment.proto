@@ -2,8 +2,9 @@ syntax = "proto3";
 
 package comment.v1;
 
-option go_package = "github.com/flow-note/api-contracts/generated/comment/v1;commentv1";
+option go_package = "github.com/flow-note/api-contracts/generated/proto/comment/v1;commentv1";
 
+import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -57,9 +58,31 @@ message UnsubscribeToCommentRequest {
 }
 
 service CommentService {
-  rpc MakeComment(CreateCommentRequest) returns (CreateCommentResponce);
-  rpc SubscribeToComment(SubscribeToCommentRequest) returns (google.protobuf.Empty);
-  rpc UnsubscribeToComment(UnsubscribeToCommentRequest) returns (google.protobuf.Empty);
-  rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse);
-  rpc GetComment(GetCommentRequest) returns (GetCommentResponce);
+  rpc MakeComment(CreateCommentRequest) returns (CreateCommentResponce) {
+    option (google.api.http) = {
+      post: "/v1/comments"
+      body: "*"
+    };
+  }
+  rpc SubscribeToComment(SubscribeToCommentRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      post: "/v1/comments/subscriptions"
+      body: "*"
+    };
+  }
+  rpc UnsubscribeToComment(UnsubscribeToCommentRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/comments/subscriptions/{page_id}/{user_id}"
+    };
+  }
+  rpc ListComments(ListCommentsRequest) returns (ListCommentsResponse) {
+    option (google.api.http) = {
+      get: "/v1/comments"
+    };
+  }
+  rpc GetComment(GetCommentRequest) returns (GetCommentResponce) {
+    option (google.api.http) = {
+      get: "/v1/comments/{comment_id}"
+    };
+  }
 }

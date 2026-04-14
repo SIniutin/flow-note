@@ -7,6 +7,7 @@ import (
 
 	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
 	collabpb "github.com/flow-note/api-contracts/generated/proto/collab/v1"
+	commentpb "github.com/flow-note/api-contracts/generated/proto/comment/v1"
 	"github.com/flow-note/api-gateway/internal/handlers"
 	"github.com/flow-note/api-gateway/internal/middleware"
 	"github.com/flow-note/common/authsecurity"
@@ -62,6 +63,10 @@ func (a *App) Run(ctx context.Context) error {
 		logger.Error("failed to setup collab table service handler", zap.Error(err))
 		return err
 	}
+	if err := commentpb.RegisterCommentServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.CommentGRPCAddr, dialOpts); err != nil {
+		logger.Error("failed to setup comment service handler", zap.Error(err))
+		return err
+	}
 
 	// ── Protected mux (requires valid JWT) ───────────────────────────────────
 	mux := http.NewServeMux()
@@ -102,6 +107,7 @@ func (a *App) Run(ctx context.Context) error {
 		zap.String("http_addr", a.cfg.HTTPAddr),
 		zap.String("auth_addr", a.cfg.AuthGRPCAddr),
 		zap.String("collab_grpc_addr", a.cfg.CollabGRPCAddr),
+		zap.String("comment_grpc_addr", a.cfg.CommentGRPCAddr),
 		zap.String("collab_addr", a.cfg.CollabAddr),
 		zap.String("allowed_origin", a.cfg.AllowedOrigin),
 	)
