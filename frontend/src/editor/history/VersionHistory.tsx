@@ -68,7 +68,7 @@ export function VersionHistory({ pageId, onClose, onPreview }: VersionHistoryPro
     const [loadingId, setLoadingId] = useState<number | null>(null);
     const [error, setError]         = useState<string | null>(null);
 
-    useEffect(() => {
+    function loadVersions() {
         if (!getAccessToken()) { setLoading(false); return; }
         setLoading(true);
         setError(null);
@@ -76,7 +76,9 @@ export function VersionHistory({ pageId, onClose, onPreview }: VersionHistoryPro
             .then(({ versions: v }) => setVersions(v ?? []))
             .catch(() => setError("Не удалось загрузить историю версий"))
             .finally(() => setLoading(false));
-    }, [pageId]);
+    }
+
+    useEffect(() => { loadVersions(); }, [pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     async function handlePreview(v: BackendVersion) {
         setLoadingId(v.id);
@@ -94,7 +96,8 @@ export function VersionHistory({ pageId, onClose, onPreview }: VersionHistoryPro
             yApplyUpdate(doc, bytes);
             const date = keyToDate(v.date);
             onPreview(doc, `Версия #${v.id} · ${formatDate(date)}`);
-        } catch {
+        } catch (err) {
+            console.error("[VersionHistory] preview failed:", err);
             setError("Не удалось загрузить версию");
         } finally {
             setLoadingId(null);
@@ -121,8 +124,8 @@ export function VersionHistory({ pageId, onClose, onPreview }: VersionHistoryPro
 
             {/* Error */}
             {error && (
-                <div className="vh__error" onClick={() => setError(null)}>
-                    {error}
+                <div className="vh__error" onClick={loadVersions} title="Нажмите чтобы повторить">
+                    {error} — <u>повторить</u>
                 </div>
             )}
 

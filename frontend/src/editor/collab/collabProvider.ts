@@ -16,6 +16,7 @@ import { getAccessToken } from "../../data/authStore";
 const WS_BASE = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/collab`;
 
 
+
 // ── Singleton state ───────────────────────────────────────────────────────────
 
 export let ydoc: Y.Doc = new Y.Doc();
