@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 
+	notifyv1 "github.com/flow-note/api-contracts/generated/notify/v1"
 	"github.com/flow-note/common/authctx"
 	"github.com/flow-note/common/broker"
 	commonrt "github.com/flow-note/common/realtime"
@@ -11,10 +12,10 @@ import (
 	"github.com/flow-note/common/runtime/postgres"
 	"github.com/flow-note/notify-service/internal/config"
 	"github.com/flow-note/notify-service/internal/consumer"
+	"github.com/flow-note/notify-service/internal/migrate"
 	"github.com/flow-note/notify-service/internal/repository"
 	"github.com/flow-note/notify-service/internal/service"
 	grpcHandler "github.com/flow-note/notify-service/internal/transport/grpc"
-	notifyv1 "github.com/flow-note/proto/notify/v1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -32,6 +33,9 @@ type App struct {
 func New(ctx context.Context, cfg config.Config) (*App, error) {
 	logger, err := logging.New(cfg.LogLevel)
 	if err != nil {
+		return nil, err
+	}
+	if err := migrate.Up(ctx, cfg.PostgresDSN); err != nil {
 		return nil, err
 	}
 	db, err := postgres.New(ctx, cfg.PostgresDSN)

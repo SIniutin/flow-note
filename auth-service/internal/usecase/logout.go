@@ -4,7 +4,7 @@ import (
 	"context"
 
 	d "github.com/flow-note/auth-service/internal/domain"
-	sec "github.com/tasker-iniutin/common/authsecurity"
+	sec "github.com/flow-note/common/authsecurity"
 )
 
 type LogoutUser struct {

@@ -8,8 +8,8 @@ import (
 
 	d "github.com/flow-note/auth-service/internal/domain"
 	"github.com/flow-note/auth-service/internal/store/mem"
+	sec "github.com/flow-note/common/authsecurity"
 	"github.com/google/uuid"
-	sec "github.com/tasker-iniutin/common/authsecurity"
 	"golang.org/x/crypto/bcrypt"
 )
 

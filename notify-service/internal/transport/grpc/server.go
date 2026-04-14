@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"time"
 
+	notifyv1 "github.com/flow-note/api-contracts/generated/notify/v1"
 	"github.com/flow-note/common/authctx"
 	"github.com/flow-note/common/realtime"
 	"github.com/flow-note/notify-service/internal/domain"
 	"github.com/flow-note/notify-service/internal/service"
-	notifyv1 "github.com/flow-note/proto/notify/v1"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

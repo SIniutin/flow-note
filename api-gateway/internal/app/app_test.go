@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	authpb "github.com/flow-note/auth-service/generated/proto/v1"
+	authpb "github.com/flow-note/api-contracts/generated/auth/v1"
 	sec "github.com/tasker-iniutin/common/authsecurity"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"

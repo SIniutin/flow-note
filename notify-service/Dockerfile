@@ -1,18 +1,18 @@
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 
 WORKDIR /src
 
 # Copy shared local modules referenced by replace directives
 COPY common/ /src/common/
-COPY proto/   /src/proto/
+COPY api-contracts/ /src/api-contracts/
 
 # Build notify-service
 WORKDIR /src/notify-service
 COPY notify-service/go.mod notify-service/go.sum ./
 RUN go mod download
 
-COPY notify-service/cmd      ./cmd
-COPY notify-service/internal ./internal
+COPY notify-service/cmd        ./cmd
+COPY notify-service/internal   ./internal
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/notify-service ./cmd/notify-service
 

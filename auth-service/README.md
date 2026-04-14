@@ -39,9 +39,10 @@ The service follows a layered structure:
 
 Shared infrastructure lives in `common`:
 
-- `common/configenv`
-- `common/postgres`
-- `common/runtime`
+- `viper`
+- `common/runtime/postgres`
+- `common/runtime/logging`
+- `common/runtime/grpcserver`
 - `common/authsecurity`
 
 ### Why This Structure
@@ -57,7 +58,7 @@ For Go, this keeps dependencies simple and makes the code easier to review.
 
 ## API
 
-The protobuf contract is defined in `api-contracts/proto/auth/v1alpha/auth.proto`.
+The protobuf contract is defined in `api-contracts/proto/auth/v1/auth.proto`.
 
 Exposed operations:
 

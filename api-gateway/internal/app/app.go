@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
+	authpb "github.com/flow-note/api-contracts/generated/auth/v1"
 	"github.com/flow-note/api-gateway/internal/handlers"
 	"github.com/flow-note/api-gateway/internal/middleware"
-	authpb "github.com/flow-note/auth-service/generated/proto/v1"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	sec "github.com/tasker-iniutin/common/authsecurity"
 	"github.com/tasker-iniutin/common/httpauth"

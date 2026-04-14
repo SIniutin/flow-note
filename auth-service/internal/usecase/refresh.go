@@ -5,8 +5,8 @@ import (
 	"time"
 
 	d "github.com/flow-note/auth-service/internal/domain"
+	sec "github.com/flow-note/common/authsecurity"
 	"github.com/google/uuid"
-	sec "github.com/tasker-iniutin/common/authsecurity"
 )
 
 type RefreshUser struct {

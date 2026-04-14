@@ -19,3 +19,7 @@ generate:
       opts:
         paths: source_relative
         generate_unbound_methods: true
+    - name: openapiv2
+      out: ./docs
+      opts:
+        generate_unbound_methods: true

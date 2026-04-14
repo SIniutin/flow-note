@@ -8,7 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	d "github.com/flow-note/auth-service/internal/domain"
-	sec "github.com/tasker-iniutin/common/authsecurity"
+	sec "github.com/flow-note/common/authsecurity"
 )
 
 type RegisterUser struct {

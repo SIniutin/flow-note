@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
+	commentv1 "github.com/flow-note/api-contracts/generated/comment/v1"
 	"github.com/flow-note/comment-service/internal/domain"
 	"github.com/flow-note/comment-service/internal/service"
 	"github.com/flow-note/common/authctx"
-	commentv1 "github.com/flow-note/proto/comment/v1"
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

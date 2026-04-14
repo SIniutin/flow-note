@@ -8,7 +8,7 @@ import (
 	d "github.com/flow-note/auth-service/internal/domain"
 	uc "github.com/flow-note/auth-service/internal/usecase"
 
-	pb "github.com/flow-note/auth-service/generated/proto/v1"
+	pb "github.com/flow-note/api-contracts/generated/auth/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"

@@ -37,7 +37,7 @@ type Anchor struct {
 }
 
 // Validate returns an error if the anchor is semantically invalid.
-func (a Anchor) Validate() error {
+func (a *Anchor) Validate() error {
 	if a.Kind == "" {
 		return errors.New("anchor kind is required")
 	}
@@ -45,7 +45,7 @@ func (a Anchor) Validate() error {
 }
 
 // Hash returns a short deterministic fingerprint of the anchor for deduplication.
-func (a Anchor) Hash() (string, error) {
+func (a *Anchor) Hash() (string, error) {
 	b, err := json.Marshal(a)
 	if err != nil {
 		return "", fmt.Errorf("anchor hash: %w", err)
@@ -66,8 +66,8 @@ type BodyNode struct {
 type CommentBody []BodyNode
 
 // Validate returns true if the body contains at least one non-empty node.
-func (b CommentBody) Validate() bool {
-	for _, node := range b {
+func (b *CommentBody) Validate() bool {
+	for _, node := range *b {
 		if strings.TrimSpace(node.Text) != "" || node.Type == "mention" {
 			return true
 		}
@@ -76,9 +76,9 @@ func (b CommentBody) Validate() bool {
 }
 
 // PlainTextPreview returns a plain-text preview truncated to maxLen runes.
-func (b CommentBody) PlainTextPreview(maxLen int) string {
+func (b *CommentBody) PlainTextPreview(maxLen int) string {
 	var sb strings.Builder
-	for _, node := range b {
+	for _, node := range *b {
 		if node.Text != "" {
 			sb.WriteString(node.Text)
 		} else if node.Label != "" {
@@ -94,9 +94,9 @@ func (b CommentBody) PlainTextPreview(maxLen int) string {
 }
 
 // MentionedUserIDs returns all user IDs referenced in mention nodes.
-func (b CommentBody) MentionedUserIDs() []uuid.UUID {
+func (b *CommentBody) MentionedUserIDs() []uuid.UUID {
 	out := make([]uuid.UUID, 0)
-	for _, node := range b {
+	for _, node := range *b {
 		if node.Type == "mention" && node.UserID != nil {
 			out = append(out, *node.UserID)
 		}

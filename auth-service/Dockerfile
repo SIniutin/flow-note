@@ -1,14 +1,17 @@
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 
-WORKDIR /src
+WORKDIR /src/auth-service
 
-COPY go.mod go.sum ./
+COPY common /src/common
+COPY api-contracts /src/api-contracts
+COPY auth-service/go.mod auth-service/go.sum ./
 RUN go mod download
 
-COPY cmd ./cmd
-COPY generated ./generated
-COPY internal ./internal
-COPY proto ./proto
+COPY auth-service/cmd ./cmd
+COPY auth-service/internal ./internal
+COPY auth-service/migrations ./migrations
+COPY auth-service/google ./google
+COPY auth-service/README.md ./README.md
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/auth-service ./cmd/auth-service
 

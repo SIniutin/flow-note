@@ -1,18 +1,18 @@
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 
 WORKDIR /src
 
 # Copy shared local modules referenced by replace directives
 COPY common/ /src/common/
-COPY proto/   /src/proto/
+COPY api-contracts/ /src/api-contracts/
 
 # Build comment-service
 WORKDIR /src/comment-service
 COPY comment-service/go.mod comment-service/go.sum ./
 RUN go mod download
 
-COPY comment-service/cmd      ./cmd
-COPY comment-service/internal ./internal
+COPY comment-service/cmd        ./cmd
+COPY comment-service/internal   ./internal
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/comment-service ./cmd/comment-service
 

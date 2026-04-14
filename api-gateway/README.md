@@ -35,7 +35,7 @@ Shared infrastructure lives in `common`:
 
 HTTP endpoints are generated from protobuf annotations in `api-contracts`:
 
-- `api-contracts/proto/auth/v1alpha/auth.proto`
+- `api-contracts/proto/auth/v1/auth.proto`
 
 ## Auth Behavior
 

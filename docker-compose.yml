@@ -241,8 +241,8 @@ services:
   # ── Auth Service ─────────────────────────────────────────────────────────────
   auth-service:
     build:
-      context: ./auth-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: auth-service/Dockerfile
     restart: unless-stopped
     expose:
       - "50052"
@@ -265,28 +265,6 @@ services:
         condition: service_healthy
 
 
-  # ── Comment-service migrations ───────────────────────────────────────────────
-  comment-migrate:
-    image: ghcr.io/pressly/goose:latest
-    volumes:
-      - ./comment-service/migrations:/migrations
-    command: ["-dir", "/migrations", "postgres", "postgres://comment:comment@postgres-comment:5432/commentdb?sslmode=disable", "up"]
-    depends_on:
-      postgres-comment:
-        condition: service_healthy
-    restart: "no"
-
-  # ── Notify-service migrations ─────────────────────────────────────────────────
-  notify-migrate:
-    image: ghcr.io/pressly/goose:latest
-    volumes:
-      - ./notify-service/migrations:/migrations
-    command: ["-dir", "/migrations", "postgres", "postgres://notify:notify@postgres-notify:5432/notifydb?sslmode=disable", "up"]
-    depends_on:
-      postgres-notify:
-        condition: service_healthy
-    restart: "no"
-
   # ── Comment Service ───────────────────────────────────────────────────────────
   comment-service:
     build:
@@ -304,8 +282,6 @@ services:
     depends_on:
       postgres-comment:
         condition: service_healthy
-      comment-migrate:
-        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
 
@@ -328,8 +304,6 @@ services:
     depends_on:
       postgres-notify:
         condition: service_healthy
-      notify-migrate:
-        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
       redis:
@@ -362,8 +336,8 @@ services:
   # ── API Gateway (nginx) ──────────────────────────────────────────────────────
   api-gateway:
     build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api-gateway/Dockerfile
     restart: unless-stopped
     ports:
       - "80:8080"

@@ -1,13 +1,16 @@
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 
 WORKDIR /src
 
-COPY go.mod go.sum ./
+# api-gateway has a replace directive: github.com/flow-note/api-contracts => ../api-contracts
+COPY api-contracts/ /src/api-contracts/
+
+WORKDIR /src/api-gateway
+COPY api-gateway/go.mod api-gateway/go.sum ./
 RUN go mod download
 
-COPY cmd ./cmd
-COPY internal ./internal
-COPY proto ./proto
+COPY api-gateway/cmd      ./cmd
+COPY api-gateway/internal ./internal
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/api-gateway ./cmd/gateway
 

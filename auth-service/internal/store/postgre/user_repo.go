@@ -6,18 +6,17 @@ import (
 	"fmt"
 
 	d "github.com/flow-note/auth-service/internal/domain"
+	"github.com/flow-note/common/runtime/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	commonpg "github.com/tasker-iniutin/common/postgres"
 )
 
 type userRepoImpl struct {
-	db *pgxpool.Pool
+	db *postgres.DB
 }
 
-func NewPostgreRepo(db *pgxpool.Pool) *userRepoImpl {
+func NewPostgreRepo(db *postgres.DB) *userRepoImpl {
 	return &userRepoImpl{db: db}
 }
 
@@ -33,7 +32,7 @@ func (r *userRepoImpl) Create(ctx context.Context, u d.User, password d.Password
 	`
 
 	var nU d.User
-	err := commonpg.WithTx(ctx, r.db, func(tx pgx.Tx) error {
+	err := r.db.WithTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		var (
 			id       uuid.UUID
 			rawEmail string
