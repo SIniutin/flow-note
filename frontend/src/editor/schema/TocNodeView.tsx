@@ -27,7 +27,8 @@ function extractHeadings(doc: NodeViewProps["editor"]["state"]["doc"]): TocItem[
 
 export function TocNodeView({ editor, selected }: NodeViewProps) {
     // useEditorState подписывает NodeView на обновления документа
-    useEditorState({ editor, selector: s => s.doc });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useEditorState({ editor, selector: (s: any) => s.doc });
 
     const headings = extractHeadings(editor.state.doc);
 

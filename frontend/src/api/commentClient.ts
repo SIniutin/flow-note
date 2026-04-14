@@ -1,63 +1,21 @@
 // ─── src/api/commentClient.ts ─────────────────────────────────────────────────
-// HTTP клиент для CommentService (gRPC-gateway, /api/v1/*)
+// HTTP клиент для CommentService (gRPC-gateway).
+// Пути — gRPC-стиль (/comment.v1.CommentService/{Method}), т.к. proto не имеет
+// google.api.http аннотаций. gRPC-gateway сериализует поля в lowerCamelCase.
 
 import { getAccessToken } from "../data/authStore";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types (соответствуют proto comment.v1) ────────────────────────────────────
 
-export interface Anchor {
-    kind: string;
-    block_id: string;
-    start_offset?: number;
-    end_offset?: number;
-    selected_text: string;
-    context_before: string;
-    context_after: string;
-    snapshot_id?: string;
-    table_id?: string;
-    row_id?: string;
-    column_id?: string;
-}
-
-export interface BodyNode {
-    type: string;
-    text: string;
-    label?: string;
-    user_id?: string;
-}
-
-export interface Thread {
-    id: string;
-    page_id: string;
-    anchor: Anchor;
-    anchor_hash: string;
-    created_by: string;
-    status: string;
-    created_at: string;
-    updated_at: string;
-    resolved_by?: string;
-    resolved_at?: string;
-    last_commented_at?: string;
-    comments_count: number;
-}
-
-export interface Comment {
-    id: string;
-    thread_id: string;
-    parent_comment_id?: string;
-    author_id: string;
-    body: BodyNode[];
-    body_text: string;
-    created_at: string;
-    updated_at: string;
-    edited_at?: string;
-    deleted_at?: string;
-    status: string;
-}
-
-export interface ThreadWithComments {
-    thread: Thread;
-    comments: Comment[];
+export interface ProtoComment {
+    id:        string;
+    userId:    string;
+    parentId:  string;   // "" — корневой комментарий
+    pageId:    string;
+    bodyId:    string;
+    deleted:   boolean;
+    body:      string;
+    createdAt: string;   // ISO от grpc Timestamp
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -69,15 +27,11 @@ function authHeaders(): Record<string, string> {
     return headers;
 }
 
-async function request<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-): Promise<T> {
+async function post<T>(path: string, body: unknown): Promise<T> {
     const res = await fetch(path, {
-        method,
+        method: "POST",
         headers: authHeaders(),
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        body: JSON.stringify(body),
     });
     if (!res.ok) {
         const text = await res.text().catch(() => "");
@@ -86,80 +40,61 @@ async function request<T>(
         throw new Error(message || `HTTP ${res.status}`);
     }
     if (res.status === 204) return undefined as T;
-    const ct = res.headers.get("content-type") ?? "";
-    if (!ct.includes("application/json")) return undefined as T;
     return res.json();
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
 
 export const commentClient = {
-    // POST /api/v1/pages/{page_id}/threads
-    createThread(
-        pageId: string,
-        anchor: Anchor,
-        body: BodyNode[],
-    ): Promise<{ thread: Thread; root_comment: Comment }> {
-        return request("POST", `/api/v1/pages/${pageId}/threads`, { anchor, body });
+    /**
+     * Создать комментарий (или ответ, если указан parentId).
+     * POST /comment.v1.CommentService/MakeComment
+     */
+    makeComment(params: {
+        userId:   string;
+        pageId:   string;
+        body:     string;
+        parentId?: string;
+        bodyId?:   string;
+    }): Promise<{ comment: ProtoComment }> {
+        return post("/comment.v1.CommentService/MakeComment", {
+            userId:   params.userId,
+            pageId:   params.pageId,
+            body:     params.body,
+            parentId: params.parentId ?? "",
+            bodyId:   params.bodyId   ?? "",
+        });
     },
 
-    // GET /api/v1/pages/{page_id}/threads?active_only=&limit=&offset=
-    listThreads(
-        pageId: string,
-        opts: { active_only?: boolean; limit?: number; offset?: number } = {},
-    ): Promise<{ items: Thread[] }> {
-        const params = new URLSearchParams();
-        if (opts.active_only !== undefined) params.set("active_only", String(opts.active_only));
-        if (opts.limit     !== undefined) params.set("limit",       String(opts.limit));
-        if (opts.offset    !== undefined) params.set("offset",      String(opts.offset));
-        const qs = params.toString() ? `?${params}` : "";
-        return request("GET", `/api/v1/pages/${pageId}/threads${qs}`);
+    /**
+     * Список комментариев страницы.
+     * POST /comment.v1.CommentService/ListComments
+     */
+    listComments(pageId: string): Promise<{ comments: ProtoComment[] }> {
+        return post("/comment.v1.CommentService/ListComments", { pageId });
     },
 
-    // GET /api/v1/pages/{page_id}/discussions
-    listDiscussions(
-        pageId: string,
-        opts: { limit?: number; offset?: number } = {},
-    ): Promise<{ items: Thread[] }> {
-        const params = new URLSearchParams();
-        if (opts.limit  !== undefined) params.set("limit",  String(opts.limit));
-        if (opts.offset !== undefined) params.set("offset", String(opts.offset));
-        const qs = params.toString() ? `?${params}` : "";
-        return request("GET", `/api/v1/pages/${pageId}/discussions${qs}`);
+    /**
+     * Один комментарий по id.
+     * POST /comment.v1.CommentService/GetComment
+     */
+    getComment(commentId: string): Promise<{ comment: ProtoComment }> {
+        return post("/comment.v1.CommentService/GetComment", { commentId });
     },
 
-    // GET /api/v1/threads/{thread_id}
-    getThread(threadId: string): Promise<{ item: ThreadWithComments }> {
-        return request("GET", `/api/v1/threads/${threadId}`);
+    /**
+     * Подписаться на уведомления о комментариях страницы.
+     * POST /comment.v1.CommentService/SubscribeToComment
+     */
+    subscribe(userId: string, pageId: string): Promise<void> {
+        return post("/comment.v1.CommentService/SubscribeToComment", { userId, pageId });
     },
 
-    // POST /api/v1/threads/{thread_id}/replies
-    addReply(threadId: string, body: BodyNode[]): Promise<{ comment: Comment }> {
-        return request("POST", `/api/v1/threads/${threadId}/replies`, { body });
-    },
-
-    // POST /api/v1/threads/{thread_id}:resolve
-    resolveThread(threadId: string): Promise<void> {
-        return request("POST", `/api/v1/threads/${threadId}:resolve`, {});
-    },
-
-    // POST /api/v1/threads/{thread_id}:reopen
-    reopenThread(threadId: string): Promise<void> {
-        return request("POST", `/api/v1/threads/${threadId}:reopen`, {});
-    },
-
-    // DELETE /api/v1/comments/{comment_id}
-    deleteComment(commentId: string): Promise<void> {
-        return request("DELETE", `/api/v1/comments/${commentId}`);
-    },
-
-    // POST /api/v1/threads/{thread_id}:follow
-    followThread(threadId: string): Promise<void> {
-        return request("POST", `/api/v1/threads/${threadId}:follow`, {});
-    },
-
-    // POST /api/v1/threads/{thread_id}:unfollow
-    unfollowThread(threadId: string): Promise<void> {
-        return request("POST", `/api/v1/threads/${threadId}:unfollow`, {});
+    /**
+     * Отписаться от уведомлений.
+     * POST /comment.v1.CommentService/UnsubscribeToComment
+     */
+    unsubscribe(userId: string, pageId: string): Promise<void> {
+        return post("/comment.v1.CommentService/UnsubscribeToComment", { userId, pageId });
     },
 };

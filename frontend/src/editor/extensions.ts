@@ -6,6 +6,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+import { Extension } from "@tiptap/core";
 
 import { BlockIdExtension }          from "./schema/BlockIdExtension";
 import { EmbedMediaExtension }       from "./schema/EmbedMediaExtension";
@@ -33,7 +35,54 @@ export const AVATAR_COLORS: Record<1|2|3|4, string> = {
     4: "#ff7a7a",
 };
 
+// ── Keyboard shortcuts extension ──────────────────────────────────────────────
+// Горячие клавиши для редактора (дополняют дефолтные из StarterKit).
+// Полный список в README.md.
+const KeyboardShortcuts = Extension.create({
+    name: "keyboardShortcuts",
+
+    addKeyboardShortcuts() {
+        return {
+            // ── Заголовки ─────────────────────────────────────────────────
+            "Mod-Alt-1": () => this.editor.chain().focus().toggleHeading({ level: 1 }).run(),
+            "Mod-Alt-2": () => this.editor.chain().focus().toggleHeading({ level: 2 }).run(),
+            "Mod-Alt-3": () => this.editor.chain().focus().toggleHeading({ level: 3 }).run(),
+
+            // ── Списки ───────────────────────────────────────────────────
+            "Mod-Shift-8": () => this.editor.chain().focus().toggleBulletList().run(),
+            "Mod-Shift-9": () => this.editor.chain().focus().toggleOrderedList().run(),
+
+            // ── Блоки ────────────────────────────────────────────────────
+            "Mod-Shift-b": () => this.editor.chain().focus().toggleBlockquote().run(),
+            "Mod-Alt-c":   () => this.editor.chain().focus().toggleCodeBlock().run(),
+
+            // ── Tab в списке: indent / outdent ────────────────────────────
+            "Tab": () => {
+                if (this.editor.isActive("listItem")) {
+                    return this.editor.chain().focus().sinkListItem("listItem").run();
+                }
+                return false;
+            },
+            "Shift-Tab": () => {
+                if (this.editor.isActive("listItem")) {
+                    return this.editor.chain().focus().liftListItem("listItem").run();
+                }
+                return false;
+            },
+
+            // ── Slash menu ────────────────────────────────────────────────
+            "Mod-/": () => {
+                const { state, dispatch } = this.editor.view;
+                const { tr, selection } = state;
+                dispatch(tr.insertText("/", selection.from, selection.to));
+                return true;
+            },
+        };
+    },
+});
+
 export function createEditorExtensions(currentUser: User) {
+    // awareness берём из live binding — актуально после connectCollab()
     awareness.setLocalStateField("user", {
         name:  currentUser.name,
         color: AVATAR_COLORS[currentUser.colorIndex],
@@ -43,7 +92,7 @@ export function createEditorExtensions(currentUser: User) {
         // ── StarterKit v3 ─────────────────────────────────────────────────
         // Включает: paragraph, heading, blockquote, codeBlock, bulletList,
         // orderedList, listItem, horizontalRule, bold, italic, strike,
-        // underline, code, link, dropcursor, gapcursor.
+        // underline, code, dropcursor, gapcursor.
         // undoRedo: false — Collaboration управляет undo/redo через Yjs.
         StarterKit.configure({ undoRedo: false }),
 
@@ -54,23 +103,26 @@ export function createEditorExtensions(currentUser: User) {
         CharacterCount,
 
         // ── Schema extensions ─────────────────────────────────────────────
-        // block_id для всех блоков
         BlockIdExtension,
-
-        // embed_media — заменяет @tiptap/extension-image
         EmbedMediaExtension,
-
-        // page_link — внутренняя ссылка на вики-страницу
         PageLinkExtension,
-
-        // media_inline — эмодзи, иконки, стикеры, инлайн-файлы
         MediaInlineExtension,
-
-        // table_of_contents — автооглавление из заголовков
         TableOfContentsExtension,
 
         // ── Collaboration (Yjs) ───────────────────────────────────────────
+        // ydoc — live binding: connectCollab() обновляет значение,
+        // поэтому при перемонтировании редактора используется новый doc.
         Collaboration.configure({ document: ydoc }),
+        CollaborationCursor.configure({
+            provider: { awareness } as never,
+            user: {
+                name:  currentUser.name,
+                color: AVATAR_COLORS[currentUser.colorIndex],
+            },
+        }),
+
+        // ── Keyboard shortcuts ────────────────────────────────────────────
+        KeyboardShortcuts,
 
         // ── App extensions ────────────────────────────────────────────────
         SlashExtension,
@@ -82,4 +134,4 @@ export function createEditorExtensions(currentUser: User) {
 }
 
 export const initialContent =
-    "<h1>Отчёт за IV квартал 2024</h1><p>Отчёт включает сводку…</p>";
+    "<h1>Добро пожаловать</h1><p>Начните вводить содержимое или нажмите <strong>/</strong> чтобы вставить блок.</p>";

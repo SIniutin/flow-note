@@ -1,9 +1,12 @@
 // ─── src/editor/schema/PageLinkExtension.ts ──────────────────────────────────
 // Инлайн-узел page_link по схеме wikilive_editor_contract.
 // Внутренняя ссылка на другую вики-страницу.
-// НЕ link-марка — это отдельный узел, чтобы парсер мог извлечь page_refs.
+// Включает ProseMirror-плагин для синхронизации pagelinksStore.
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { pagelinksStore } from "../../data/pagelinksStore";
+import { pagesStore } from "../../data/pagesStore";
 
 export interface PageLinkAttrs {
     page_id:          string;
@@ -74,5 +77,38 @@ export const PageLinkExtension = Node.create({
             insertPageLink: (attrs: PageLinkAttrs) => ({ commands }) =>
                 commands.insertContent({ type: this.name, attrs }),
         };
+    },
+
+    addProseMirrorPlugins() {
+        const syncLinks = (doc: import("@tiptap/pm/model").Node) => {
+            const pageIds: string[] = [];
+            doc.descendants(node => {
+                if (node.type.name === "pageLink" && node.attrs.page_id) {
+                    pageIds.push(node.attrs.page_id as string);
+                }
+            });
+            Promise.resolve().then(() => {
+                const current = pagesStore.getCurrent();
+                if (current) {
+                    pagelinksStore.syncPage(current.id, current.title, pageIds);
+                }
+            });
+        };
+
+        return [
+            new Plugin({
+                key: new PluginKey("pageLinkBacklinks"),
+                view(editorView) {
+                    syncLinks(editorView.state.doc);
+                    return {
+                        update(view, prevState) {
+                            if (view.state.doc !== prevState.doc) {
+                                syncLinks(view.state.doc);
+                            }
+                        },
+                    };
+                },
+            }),
+        ];
     },
 });

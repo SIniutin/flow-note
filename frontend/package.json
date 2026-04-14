@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.19",
+    "@hocuspocus/provider": "^3.4.4",
     "@tiptap/extension-character-count": "^3.22.3",
     "@tiptap/extension-collaboration": "^3.22.3",
     "@tiptap/extension-collaboration-cursor": "^3.0.0",

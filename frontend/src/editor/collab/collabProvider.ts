@@ -1,28 +1,57 @@
 // ─── src/editor/collab/collabProvider.ts ─────────────────────────────────────
-// Синглтон: один Y.Doc и один WebrtcProvider на всё приложение.
+// Синглтон: один Y.Doc и один HocuspocusProvider.
+// HocuspocusProvider — WebSocket-based Yjs sync через collab-service.
+// При смене страницы вызвать connectCollab(pageId) и перемонтировать редактор
+// через key={pageId} чтобы TipTap подхватил новый ydoc.
 //
-// WebrtcProvider с signaling: [] работает ТОЛЬКО через BroadcastChannel —
-// т.е. синхронизация между вкладками одного браузера без внешнего сервера.
-// Для межсетевого колллаба нужно добавить адрес signaling-сервера.
+// ES-модули используют live bindings: изменение export let ydoc / awareness
+// в connectCollab() сразу видно всем импортёрам при следующем обращении.
 
 import * as Y from "yjs";
-import { WebrtcProvider } from "y-webrtc";
+import { HocuspocusProvider } from "@hocuspocus/provider";
+import { getAccessToken } from "../../data/authStore";
 
-export const ROOM_NAME = "wiki-editor-v1";
+// ── WebSocket base URL ─────────────────────────────────────────────────────────
+const WS_BASE = `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/collab`;
 
-/** Общий Y.Doc — один на всё приложение */
-export const ydoc = new Y.Doc();
+// ── Singleton state ───────────────────────────────────────────────────────────
+
+export let ydoc: Y.Doc = new Y.Doc();
+
+function makeProvider(pageId: string, doc: Y.Doc): HocuspocusProvider {
+    const p = new HocuspocusProvider({
+        url: WS_BASE,
+        name: pageId,
+        document: doc,
+        token: getAccessToken() ?? "",
+        onConnect:    () => console.log(`[collab] connected  page=${pageId}`),
+        onDisconnect: () => console.log(`[collab] disconnected  page=${pageId}`),
+        onAuthenticated: () => console.log(`[collab] authenticated  page=${pageId}`),
+        onAuthenticationFailed: ({ reason }: { reason: string }) =>
+            console.warn(`[collab] auth failed page=${pageId}:`, reason),
+        onClose: ({ event }: { event: CloseEvent }) =>
+            console.warn(`[collab] ws closed  page=${pageId}  code=${event.code}`),
+    });
+    return p;
+}
+
+export let provider: HocuspocusProvider = makeProvider("page-default", ydoc);
+export let awareness = provider.awareness;
+
+// ── Page switch ───────────────────────────────────────────────────────────────
 
 /**
- * WebRTC провайдер.
- * signaling: [] — отключаем внешние серверы, используем только
- * BroadcastChannel (синхронизация между вкладками того же браузера).
+ * Переподключиться к другому документу.
+ * После вызова — обязательно перемонтировать редактор (key={pageId}),
+ * иначе TipTap продолжит работать со старым ydoc.
  */
-export const provider = new WebrtcProvider(ROOM_NAME, ydoc, {
-    signaling: [],      // BroadcastChannel only — no external servers needed
-    maxConns: 20,
-    filterBcConns: false,
-});
+export function connectCollab(pageId: string): void {
+    provider.destroy();
+    ydoc.destroy();
 
-/** Awareness: хранит состояние присутствия всех пользователей */
-export const awareness = provider.awareness;
+    ydoc     = new Y.Doc();
+    provider = makeProvider(pageId, ydoc);
+    awareness = provider.awareness;
+}
+
+export const ROOM_NAME = "wiki-editor-v1"; // kept for backward compat

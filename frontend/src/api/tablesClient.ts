@@ -1,59 +1,55 @@
 // ─── src/api/tablesClient.ts ──────────────────────────────────────────────────
-// Мок-клиент MWS Tables. Ключ localStorage согласован с остальными ключами
-// проекта (editor:*:v1). API намеренно асинхронный — замена на реальный
-// бэкенд сведётся к смене реализации без изменения вызывающего кода.
+// Клиент MWS Tables.
+// Вызывает реальный API: GET/PATCH /fusion/v1/datasheets/:dstId/records
+// (проксируется через vite → mock-tables сервер или реальный MWS API).
+//
+// Структура ответа MWS Fusion API:
+//   { success, code, message, data: { records: [{ recordId, fields }] } }
+//
+// Для listTables() / searchTables() используем локальный catalog (seed),
+// т.к. MWS API не имеет /datasheets/list endpoint.
+// Строки таблицы загружаются реально через API.
 
-import type { MwsTable } from "../types/mwsTable";
+import type { MwsTable, MwsColumn, MwsRow } from "../types/mwsTable";
+import { getAccessToken } from "../data/authStore";
 
-// ── seed data ─────────────────────────────────────────────────────────────────
+// ── Catalog (metadata without rows) ──────────────────────────────────────────
+// Хранит схему колонок и метаданные таблиц. Строки всегда идут из API.
 
-const SEED: MwsTable[] = [
+interface TableMeta {
+    id:          string;
+    name:        string;
+    description: string;
+    icon:        string;
+    columns:     MwsColumn[];
+}
+
+// Catalog таблиц: id → meta. При интеграции с реальным MWS заменить на GET /datasheets.
+const CATALOG: TableMeta[] = [
     {
-        id: "tbl_roadmap",
-        name: "Product Roadmap",
-        description: "Бэклог Q2–Q3 и статусы поставки",
-        icon: "🗺️",
+        id: "tbl_roadmap", name: "Product Roadmap",
+        description: "Бэклог Q2–Q3 и статусы поставки", icon: "🗺️",
         columns: [
-            { id: "col_title",  name: "Название",   type: "text",    width: 240 },
-            { id: "col_status", name: "Статус",      type: "select",  width: 120 },
-            { id: "col_owner",  name: "Ответственный", type: "text",  width: 140 },
-            { id: "col_eta",    name: "ETA",          type: "date",   width: 120 },
-            { id: "col_done",   name: "Готово",       type: "boolean", width: 80 },
+            { id: "col_title",  name: "Название",      type: "text",    width: 240 },
+            { id: "col_status", name: "Статус",         type: "select",  width: 120 },
+            { id: "col_owner",  name: "Ответственный",  type: "text",    width: 140 },
+            { id: "col_eta",    name: "ETA",             type: "date",    width: 120 },
+            { id: "col_done",   name: "Готово",          type: "boolean", width: 80  },
         ],
-        rows: [
-            { id: "r1", cells: { col_title: "Тёмная тема",     col_status: "In Progress", col_owner: "Алиса",  col_eta: "2025-06-15", col_done: false } },
-            { id: "r2", cells: { col_title: "Экспорт PDF",      col_status: "Planned",    col_owner: "Боб",    col_eta: "2025-07-01", col_done: false } },
-            { id: "r3", cells: { col_title: "Офлайн-режим",     col_status: "Done",       col_owner: "Карол",  col_eta: "2025-05-20", col_done: true  } },
-            { id: "r4", cells: { col_title: "Realtime collab",  col_status: "Planned",    col_owner: "Дэн",    col_eta: "2025-08-01", col_done: false } },
-        ],
-        createdAt: "2025-01-10T09:00:00Z",
-        updatedAt: "2025-05-01T14:22:00Z",
     },
     {
-        id: "tbl_team",
-        name: "Team Directory",
-        description: "Контакты и роли инженерного отдела",
-        icon: "👥",
+        id: "tbl_team", name: "Team Directory",
+        description: "Контакты и роли инженерного отдела", icon: "👥",
         columns: [
-            { id: "col_name",  name: "Имя",   type: "text",  width: 180 },
-            { id: "col_role",  name: "Роль",  type: "text",  width: 180 },
+            { id: "col_name",  name: "Имя",    type: "text",   width: 180 },
+            { id: "col_role",  name: "Роль",   type: "text",   width: 180 },
             { id: "col_team",  name: "Команда", type: "select", width: 140 },
-            { id: "col_email", name: "Email", type: "url",   width: 220 },
+            { id: "col_email", name: "Email",  type: "url",    width: 220 },
         ],
-        rows: [
-            { id: "r1", cells: { col_name: "Алиса Ковальски",   col_role: "Senior Frontend", col_team: "Platform", col_email: "alice@example.com" } },
-            { id: "r2", cells: { col_name: "Боб Мюллер",        col_role: "Backend Lead",    col_team: "Core",     col_email: "bob@example.com"   } },
-            { id: "r3", cells: { col_name: "Карол Танака",       col_role: "Product Manager", col_team: "Platform", col_email: "carol@example.com" } },
-            { id: "r4", cells: { col_name: "Дэн Оби",            col_role: "Designer",        col_team: "Design",   col_email: "dan@example.com"   } },
-        ],
-        createdAt: "2025-02-01T10:00:00Z",
-        updatedAt: "2025-04-28T11:00:00Z",
     },
     {
-        id: "tbl_bugs",
-        name: "Bug Tracker",
-        description: "Открытые баги текущего спринта",
-        icon: "🐛",
+        id: "tbl_bugs", name: "Bug Tracker",
+        description: "Открытые баги текущего спринта", icon: "🐛",
         columns: [
             { id: "col_id",       name: "#",         type: "number", width: 60  },
             { id: "col_title",    name: "Название",  type: "text",   width: 260 },
@@ -61,135 +57,209 @@ const SEED: MwsTable[] = [
             { id: "col_assignee", name: "Assignee",  type: "text",   width: 140 },
             { id: "col_url",      name: "Issue URL", type: "url",    width: 200 },
         ],
-        rows: [
-            { id: "r1", cells: { col_id: 1042, col_title: "Краш при вставке из Google Docs", col_sev: "Critical", col_assignee: "Алиса", col_url: "https://github.com/org/repo/issues/1042" } },
-            { id: "r2", cells: { col_id: 1051, col_title: "z-index конфликт Mention dropdown", col_sev: "Medium", col_assignee: "Боб",  col_url: "https://github.com/org/repo/issues/1051" } },
-            { id: "r3", cells: { col_id: 1060, col_title: "Slash-меню не закрывается на Escape в Safari", col_sev: "Low", col_assignee: "Карол", col_url: "https://github.com/org/repo/issues/1060" } },
-        ],
-        createdAt: "2025-03-15T08:00:00Z",
-        updatedAt: "2025-05-03T16:45:00Z",
     },
     {
-        id: "tbl_okrs",
-        name: "OKRs Q2 2025",
-        description: "Цели и ключевые результаты квартала",
-        icon: "🎯",
+        id: "tbl_okrs", name: "OKRs Q2 2025",
+        description: "Цели и ключевые результаты квартала", icon: "🎯",
         columns: [
-            { id: "col_obj",   name: "Цель",            type: "text",   width: 260 },
-            { id: "col_kr",    name: "Ключевой результат", type: "text", width: 260 },
-            { id: "col_prog",  name: "Прогресс %",       type: "number", width: 110 },
-            { id: "col_owner", name: "Ответственный",    type: "text",   width: 130 },
+            { id: "col_obj",   name: "Цель",              type: "text",   width: 260 },
+            { id: "col_kr",    name: "Ключевой результат", type: "text",   width: 260 },
+            { id: "col_prog",  name: "Прогресс %",         type: "number", width: 110 },
+            { id: "col_owner", name: "Ответственный",      type: "text",   width: 130 },
         ],
-        rows: [
-            { id: "r1", cells: { col_obj: "Выпустить wiki-редактор v1", col_kr: "TipTap-интеграция готова",       col_prog: 80, col_owner: "Алиса" } },
-            { id: "r2", cells: { col_obj: "Выпустить wiki-редактор v1", col_kr: "Realtime collab в staging",      col_prog: 30, col_owner: "Боб"   } },
-            { id: "r3", cells: { col_obj: "Улучшить онбординг",         col_kr: "Time-to-first-doc < 2 мин",     col_prog: 55, col_owner: "Карол" } },
-        ],
-        createdAt: "2025-04-01T07:00:00Z",
-        updatedAt: "2025-05-02T09:30:00Z",
     },
 ];
 
-// ── store ─────────────────────────────────────────────────────────────────────
+// ── Seed rows fallback (когда API недоступен) ─────────────────────────────────
+// При запущенном mock-tables сервере (npm run mock:tables в collab-service) строки
+// грузятся по API. Здесь — только fallback.
 
-const LS_KEY = "editor:mws-tables:v1";
+const SEED_ROWS: Record<string, Array<{ id: string; cells: Record<string, string | number | boolean | null> }>> = {
+    tbl_roadmap: [
+        { id: "r1", cells: { col_title: "Тёмная тема",    col_status: "In Progress", col_owner: "Алиса",  col_eta: "2025-06-15", col_done: false } },
+        { id: "r2", cells: { col_title: "Экспорт PDF",     col_status: "Planned",    col_owner: "Боб",    col_eta: "2025-07-01", col_done: false } },
+        { id: "r3", cells: { col_title: "Офлайн-режим",    col_status: "Done",       col_owner: "Карол",  col_eta: "2025-05-20", col_done: true  } },
+        { id: "r4", cells: { col_title: "Realtime collab", col_status: "Planned",    col_owner: "Дэн",    col_eta: "2025-08-01", col_done: false } },
+    ],
+    tbl_team: [
+        { id: "r1", cells: { col_name: "Алиса Ковальски",  col_role: "Senior Frontend", col_team: "Platform", col_email: "alice@example.com" } },
+        { id: "r2", cells: { col_name: "Боб Мюллер",       col_role: "Backend Lead",    col_team: "Core",     col_email: "bob@example.com"   } },
+        { id: "r3", cells: { col_name: "Карол Танака",      col_role: "Product Manager", col_team: "Platform", col_email: "carol@example.com" } },
+        { id: "r4", cells: { col_name: "Дэн Оби",           col_role: "Designer",        col_team: "Design",   col_email: "dan@example.com"   } },
+    ],
+    tbl_bugs: [
+        { id: "r1", cells: { col_id: 1042, col_title: "Краш при вставке из Google Docs",                col_sev: "Critical", col_assignee: "Алиса", col_url: "https://github.com/org/repo/issues/1042" } },
+        { id: "r2", cells: { col_id: 1051, col_title: "z-index конфликт Mention dropdown",              col_sev: "Medium",   col_assignee: "Боб",   col_url: "https://github.com/org/repo/issues/1051" } },
+        { id: "r3", cells: { col_id: 1060, col_title: "Slash-меню не закрывается на Escape в Safari",   col_sev: "Low",      col_assignee: "Карол", col_url: "https://github.com/org/repo/issues/1060" } },
+    ],
+    tbl_okrs: [
+        { id: "r1", cells: { col_obj: "Выпустить wiki-редактор v1", col_kr: "TipTap-интеграция готова",  col_prog: 80, col_owner: "Алиса" } },
+        { id: "r2", cells: { col_obj: "Выпустить wiki-редактор v1", col_kr: "Realtime collab в staging", col_prog: 30, col_owner: "Боб"   } },
+        { id: "r3", cells: { col_obj: "Улучшить онбординг",         col_kr: "Time-to-first-doc < 2 мин", col_prog: 55, col_owner: "Карол" } },
+    ],
+};
 
-function loadStore(): Map<string, MwsTable> {
-    const map = new Map<string, MwsTable>();
-    try {
-        const raw = localStorage.getItem(LS_KEY);
-        const list: MwsTable[] = raw ? JSON.parse(raw) : SEED;
-        list.forEach(t => map.set(t.id, t));
-    } catch {
-        SEED.forEach(t => map.set(t.id, t));
-    }
-    return map;
+// ── MWS Fusion API helpers ────────────────────────────────────────────────────
+
+interface FusionRecord {
+    recordId: string;
+    fields:   Record<string, unknown>;
 }
 
-function persist(store: Map<string, MwsTable>): void {
-    try { localStorage.setItem(LS_KEY, JSON.stringify([...store.values()])); }
-    catch (e) { console.warn("mws-tables: failed to persist", e); }
+interface FusionResponse {
+    success: boolean;
+    code:    number;
+    message: string;
+    data?:   { records?: FusionRecord[]; pageNum?: number; total?: number };
 }
 
-let store = loadStore();
-const delay = (ms = 100) => new Promise<void>(r => setTimeout(r, ms));
+function authHeaders(): Record<string, string> {
+    const token = getAccessToken();
+    return token
+        ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+        : { "Content-Type": "application/json" };
+}
+
+async function fetchRecords(dstId: string): Promise<FusionRecord[]> {
+    const res = await fetch(`/fusion/v1/datasheets/${dstId}/records`, {
+        headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(`MWS API ${res.status} for ${dstId}`);
+    const json: FusionResponse = await res.json();
+    if (!json.success) throw new Error(json.message || "MWS API error");
+    return json.data?.records ?? [];
+}
+
+async function patchRecords(dstId: string, records: FusionRecord[]): Promise<void> {
+    const res = await fetch(`/fusion/v1/datasheets/${dstId}/records`, {
+        method:  "PATCH",
+        headers: authHeaders(),
+        body:    JSON.stringify({ records }),
+    });
+    if (!res.ok) throw new Error(`MWS PATCH ${res.status} for ${dstId}`);
+}
+
+// ── Row mapping: Fusion ↔ MwsTable ───────────────────────────────────────────
+
+function fusionToRows(
+    records: FusionRecord[],
+    columns: MwsColumn[],
+): MwsRow[] {
+    return records.map(rec => {
+        const cells: Record<string, string | number | boolean | null> = {};
+        columns.forEach(col => {
+            const v = rec.fields[col.id] ?? rec.fields[col.name];
+            if (v !== undefined && v !== null) {
+                cells[col.id] = v as string | number | boolean | null;
+            }
+        });
+        if (Object.keys(cells).length === 0) {
+            const fieldKeys = Object.keys(rec.fields);
+            columns.forEach((col, i) => {
+                const raw = rec.fields[fieldKeys[i]];
+                if (raw != null) cells[col.id] = raw as string | number | boolean;
+            });
+        }
+        return { id: rec.recordId, cells };
+    });
+}
 
 // ── TTL cache ─────────────────────────────────────────────────────────────────
-// NodeView грузит таблицу при каждом монтировании. Без кэша каждый
-// ре-рендер бьёт в localStorage + JSON.parse. Кэш держит данные 30с.
-// saveTable и resetToSeed инвалидируют соответствующие записи.
 
-const CACHE_TTL = 30_000; // мс
+const CACHE_TTL = 30_000;
 
 interface CacheEntry { table: MwsTable; expiresAt: number; }
 const tableCache = new Map<string, CacheEntry>();
 
 function cacheGet(id: string): MwsTable | null {
-    const entry = tableCache.get(id);
-    if (!entry) return null;
-    if (Date.now() > entry.expiresAt) { tableCache.delete(id); return null; }
-    return entry.table;
+    const e = tableCache.get(id);
+    if (!e) return null;
+    if (Date.now() > e.expiresAt) { tableCache.delete(id); return null; }
+    return e.table;
 }
 
 function cacheSet(table: MwsTable): void {
     tableCache.set(table.id, { table, expiresAt: Date.now() + CACHE_TTL });
 }
 
-function cacheInvalidate(id: string): void {
-    tableCache.delete(id);
-}
-
 // ── public API ────────────────────────────────────────────────────────────────
 
 export const tablesClient = {
-    /** Список всех таблиц без строк (для пикера) */
+    /** Список всех таблиц без строк (из локального catalog) */
     async listTables(): Promise<Omit<MwsTable, "rows">[]> {
-        await delay();
-        return [...store.values()].map(({ rows: _, ...rest }) => rest);
+        return CATALOG.map(({ id, name, description, icon, columns }) => ({
+            id, name, description, icon, columns,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        }));
     },
 
-    /** Одна таблица со строками — сначала кэш, потом store */
+    /** Одна таблица со строками — сначала TTL кэш, потом API, потом seed fallback */
     async getTable(id: string): Promise<MwsTable | null> {
         const cached = cacheGet(id);
-        if (cached) return cached;           // кэш-хит: без задержки
-        await delay();
-        const table = store.get(id) ?? null;
-        if (table) cacheSet(table);
+        if (cached) return cached;
+
+        const meta = CATALOG.find(c => c.id === id);
+        if (!meta) return null;
+
+        let rows: MwsRow[];
+        try {
+            const records = await fetchRecords(id);
+            rows = records.length > 0
+                ? fusionToRows(records, meta.columns)
+                : (SEED_ROWS[id] ?? []);
+        } catch (e) {
+            console.warn(`[tablesClient] API unavailable for ${id}, using seed:`, e);
+            rows = SEED_ROWS[id] ?? [];
+        }
+
+        const table: MwsTable = {
+            id:          meta.id,
+            name:        meta.name,
+            description: meta.description,
+            icon:        meta.icon,
+            columns:     meta.columns,
+            rows,
+            createdAt:   new Date().toISOString(),
+            updatedAt:   new Date().toISOString(),
+        };
+        cacheSet(table);
         return table;
     },
 
-    /** Поиск по имени / описанию */
+    /** Поиск по имени / описанию (catalog-side, без API) */
     async searchTables(query: string): Promise<Omit<MwsTable, "rows">[]> {
-        await delay(50);
         const q = query.toLowerCase();
-        return [...store.values()]
-            .filter(t =>
-                t.name.toLowerCase().includes(q) ||
-                (t.description ?? "").toLowerCase().includes(q),
-            )
-            .map(({ rows: _, ...rest }) => rest);
+        return CATALOG.filter(t =>
+            t.name.toLowerCase().includes(q) ||
+            (t.description ?? "").toLowerCase().includes(q),
+        ).map(({ id, name, description, icon, columns }) => ({
+            id, name, description, icon, columns,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        }));
     },
 
-    /** Сохранение таблицы — обновляет store, кэш и localStorage */
+    /** Сохранение строк таблицы через PATCH API */
     async saveTable(table: MwsTable): Promise<MwsTable> {
-        await delay();
         const saved = { ...table, updatedAt: new Date().toISOString() };
-        store.set(saved.id, saved);
-        cacheSet(saved);                     // сразу обновляем кэш
-        persist(store);
+        // Конвертируем cells → Fusion records format
+        const records: FusionRecord[] = saved.rows.map(row => ({
+            recordId: row.id,
+            fields:   row.cells as Record<string, unknown>,
+        }));
+        try {
+            await patchRecords(table.id, records);
+        } catch (e) {
+            console.warn(`[tablesClient] saveTable API error for ${table.id}:`, e);
+        }
+        cacheSet(saved);
         return saved;
     },
 
-    /** Принудительная инвалидация кэша одной таблицы (для тестов/dev) */
+    /** Принудительная инвалидация кэша одной таблицы */
     invalidateCache(id: string): void {
-        cacheInvalidate(id);
-    },
-
-    /** Сброс к seed-данным (dev / тесты) */
-    resetToSeed(): void {
-        store = new Map(SEED.map(t => [t.id, t]));
-        tableCache.clear();
-        persist(store);
+        tableCache.delete(id);
     },
 
     /** Статистика кэша для dev-инструментов */

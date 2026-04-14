@@ -6,6 +6,7 @@ import type { NodeViewProps } from "@tiptap/react";
 import { tablesClient } from "../../api/tablesClient";
 import { BacklinksChip } from "./BacklinksChip";
 import type { MwsTable, MwsColumnType } from "../../types/mwsTable";
+import { provider } from "../collab/collabProvider";
 import "./mwsTableNodeView.css";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -95,6 +96,27 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
             })
             .catch(() => setError("Ошибка загрузки таблицы"))
             .finally(() => setLoading(false));
+    }, [tableId]);
+
+    // ── live-sync: tbl_aw от collab-service ──────────────────────────────────
+    // Hocuspocus stateless: { type: "tbl_aw", dst_id: string }
+    // При получении инвалидируем кэш и перезагружаем таблицу.
+
+    useEffect(() => {
+        if (!tableId) return;
+        const handler = ({ payload }: { payload: string }) => {
+            try {
+                const msg = JSON.parse(payload) as { type?: string; dst_id?: string };
+                if ((msg.type === "tbl_aw" || msg.type === "tbl_op") && msg.dst_id === tableId) {
+                    tablesClient.invalidateCache(tableId);
+                    tablesClient.getTable(tableId)
+                        .then(t => { if (t) setTable(t); })
+                        .catch(() => { /* ignore */ });
+                }
+            } catch { /* ignore invalid JSON */ }
+        };
+        provider.on("stateless", handler);
+        return () => { provider.off("stateless", handler); };
     }, [tableId]);
 
     // ── закрытие меню режимов ─────────────────────────────────────────────────

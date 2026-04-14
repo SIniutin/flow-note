@@ -1,6 +1,7 @@
 import type { Editor, Range } from "@tiptap/core";
 import { mwsTableCommand } from "../mwsTable/mwsTableCommand";
 import { emojiPickerStore } from "../emoji/emojiPickerStore";
+import { openPagePicker } from "../schema/PagePickerModal";
 
 export interface SlashCommand {
     title: string;
@@ -22,9 +23,19 @@ export const slashCommands: SlashCommand[] = [
         run: (e, r) => e.chain().focus().deleteRange(r).setNode("heading", { level: 2 }).run(),
     },
     {
+        title: "Заголовок 3", description: "Малый заголовок", icon: "H3",
+        keywords: ["h3", "heading", "заголовок"],
+        run: (e, r) => e.chain().focus().deleteRange(r).setNode("heading", { level: 3 }).run(),
+    },
+    {
         title: "Список", description: "Маркированный список", icon: "•",
         keywords: ["list", "bullet", "список"],
         run: (e, r) => e.chain().focus().deleteRange(r).toggleBulletList().run(),
+    },
+    {
+        title: "Нумерованный список", description: "Нумерованный список", icon: "1.",
+        keywords: ["ordered", "numbered", "list", "нумерованный", "список"],
+        run: (e, r) => e.chain().focus().deleteRange(r).toggleOrderedList().run(),
     },
     {
         title: "Цитата", description: "Блок цитаты", icon: "\u201C",
@@ -35,6 +46,27 @@ export const slashCommands: SlashCommand[] = [
         title: "Код", description: "Блок кода", icon: "</>",
         keywords: ["code", "код"],
         run: (e, r) => e.chain().focus().deleteRange(r).toggleCodeBlock().run(),
+    },
+    {
+        title: "Разделитель", description: "Горизонтальная черта", icon: "─",
+        keywords: ["hr", "divider", "separator", "разделитель"],
+        run: (e, r) => e.chain().focus().deleteRange(r).setHorizontalRule().run(),
+    },
+    {
+        title: "Ссылка на страницу",
+        description: "Вставить ссылку на другую страницу вики",
+        icon: "📄",
+        keywords: ["page", "link", "страница", "ссылка", "wiki"],
+        run: (editor, range) => {
+            editor.chain().focus().deleteRange(range).run();
+            openPagePicker().then(page => {
+                if (!page) return;
+                editor.chain().focus().insertPageLink({
+                    page_id: page.id,
+                    label:   page.title,
+                }).run();
+            });
+        },
     },
     {
         title: "Оглавление",

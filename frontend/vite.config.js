@@ -17,11 +17,17 @@ export default defineConfig({
         target: 'http://localhost:80',
         changeOrigin: true,
       },
-      // Collab WebSocket
+      // Collab WebSocket — проксируем в api-gateway → collab-service (hocuspocus)
       '/collab': {
         target: 'http://localhost:80',
         changeOrigin: true,
         ws: true,
+      },
+      // MWS Tables mock API (collab-service mock-tables: npm run mock:tables)
+      // В проде заменить target на реальный MWS_API_BASE
+      '/fusion': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
       },
     },
   },

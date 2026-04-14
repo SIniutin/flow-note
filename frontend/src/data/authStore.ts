@@ -34,6 +34,15 @@ function wipe() {
 
 export function getAccessToken(): string | null { return _accessToken; }
 
+/** Декодирует sub из JWT-payload без верификации подписи. */
+export function getCurrentUserId(): string | null {
+    if (!_accessToken) return null;
+    try {
+        const payload = JSON.parse(atob(_accessToken.split(".")[1]));
+        return (payload.sub as string) || null;
+    } catch { return null; }
+}
+
 export async function login(
     identifier: { email?: string; login?: string },
     password: string,

@@ -21,36 +21,61 @@ import {ToolbarRefContext, type ToolbarRefHandle} from "./editor/ToolbarRefConte
 import {TablePickerModal} from "./editor/mwsTable/TablePickerModal";
 import {PresenceAvatars} from "./editor/collab/PresenceAvatars";
 import {EmojiPickerPopover} from "./editor/emoji/EmojiPickerPopover";
+import {Sidebar} from "./components/Sidebar";
+import {pagesStore, useCurrentPage} from "./data/pagesStore";
+import {connectCollab} from "./editor/collab/collabProvider";
+import {VersionHistory} from "./editor/history/VersionHistory";
+import {historyStore} from "./editor/history/historyStore";
+import {ydoc} from "./editor/collab/collabProvider";
+import {useIncomingLinks} from "./data/pagelinksStore";
+import {PagePickerModal} from "./editor/schema/PagePickerModal";
+import "./components/sidebar.css";
 
 export default function App() {
     const [loading, setLoading] = useState(true);
     const [imgOpen, setImgOpen] = useState(false);
     const [stickerOpen, setStickerOpen] = useState(false);
-    const [historyOpen, setHistoryOpen] = useState(true);
+    const [rightPanel, setRightPanel] = useState<"comments" | "history" | "backlinks" | null>("comments");
     const [composerOpen, setComposerOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+    // ── Страница ──────────────────────────────────────────────────────────────
+    const currentPage = useCurrentPage();
+    const pageId = currentPage?.id ?? "page-default";
+
+    // При смене страницы переподключаем collab
+    const prevPageIdRef = useRef<string>(pageId);
+    useEffect(() => {
+        if (prevPageIdRef.current !== pageId) {
+            prevPageIdRef.current = pageId;
+            connectCollab(pageId);
+        }
+    }, [pageId]);
+
+    // ── Toolbar ref ───────────────────────────────────────────────────────────
     const toolbarElRef = useRef<HTMLElement | null>(null);
     const toolbarRefHandle = useMemo<ToolbarRefHandle>(() => ({
-        set: (el) => {
-            toolbarElRef.current = el;
-        },
+        set: (el) => { toolbarElRef.current = el; },
         get: () => toolbarElRef.current,
     }), []);
 
     useEffect(() => {
-        const t = setTimeout(() => setLoading(false), 1500);
+        const t = setTimeout(() => setLoading(false), 800);
         return () => clearTimeout(t);
     }, []);
 
     const currentUser = useCurrentUser();
-    const editor = useEditorInstance(currentUser);
+    // key={pageId} заставляет TipTap пересоздаться при смене страницы
+    // (подхватывает новый ydoc из connectCollab)
+    const editor = useEditorInstance(currentUser, pageId);
     const {
         threads, visibleThreads, activeThreadId, setActiveThreadId, setOrphanedIds, removeThread,
     } = useComments();
 
     const saveStatus = useSaveStatus(editor);
+    const incomingLinks = useIncomingLinks(pageId);
 
-    // ── Клики по comment-маркам в редакторе ─────────────────────────────────
+    // ── Клики по comment-маркам ───────────────────────────────────────────────
     useEffect(() => {
         if (!editor) return;
         let dom: HTMLElement | null = null;
@@ -58,25 +83,19 @@ export default function App() {
             const el = (e.target as HTMLElement).closest("[data-thread-id]") as HTMLElement | null;
             if (el) {
                 setActiveThreadId(el.getAttribute("data-thread-id"));
-                setHistoryOpen(true);
+                setRightPanel("comments");
             } else {
-                // Клик в редактор НЕ на comment-марку → снимаем активный тред
                 setActiveThreadId(null);
             }
         };
         const attach = () => {
             if (editor.isDestroyed) return;
-            try {
-                dom = editor.view.dom as HTMLElement;
-                dom.addEventListener("click", onClick);
-            } catch { /* view не готов */ }
+            try { dom = editor.view.dom as HTMLElement; dom.addEventListener("click", onClick); }
+            catch { /* view не готов */ }
         };
         editor.on("create", attach);
         attach();
-        return () => {
-            editor.off("create", attach);
-            if (dom) dom.removeEventListener("click", onClick);
-        };
+        return () => { editor.off("create", attach); if (dom) dom.removeEventListener("click", onClick); };
     }, [editor, setActiveThreadId]);
 
     useEffect(() => {
@@ -90,29 +109,22 @@ export default function App() {
         };
         sync();
         editor.on("update", sync);
-        return () => {
-            editor.off("update", sync);
-        };
+        return () => { editor.off("update", sync); };
     }, [editor, threads, setOrphanedIds]);
 
     useEffect(() => {
         if (!editor) return;
-        const handler = () => {
-            if (editor.state.selection.empty) setComposerOpen(false);
-        };
+        const handler = () => { if (editor.state.selection.empty) setComposerOpen(false); };
         editor.on("selectionUpdate", handler);
-        return () => {
-            editor.off("selectionUpdate", handler);
-        };
+        return () => { editor.off("selectionUpdate", handler); };
     }, [editor]);
 
-    // ── Снятие активного треда при клике вне боковой панели ─────────────────
+    // ── Клик вне боковой панели ───────────────────────────────────────────────
     const sidePanelRef = useRef<HTMLElement | null>(null);
     useEffect(() => {
         if (!activeThreadId) return;
         const handler = (e: MouseEvent) => {
             const target = e.target as Node;
-            // Не сбрасываем если клик внутри боковой панели или на comment-марке
             if (sidePanelRef.current?.contains(target)) return;
             if ((target as HTMLElement).closest?.("[data-thread-id]")) return;
             setActiveThreadId(null);
@@ -121,18 +133,17 @@ export default function App() {
         return () => document.removeEventListener("mousedown", handler);
     }, [activeThreadId, setActiveThreadId]);
 
+    // ── Image / sticker modals ────────────────────────────────────────────────
     const handleInsertImage = useCallback(() => setImgOpen(true), []);
-
     useEffect(() => {
-        const handler = () => setImgOpen(true);
-        window.addEventListener("wiki:open-image-modal", handler);
-        return () => window.removeEventListener("wiki:open-image-modal", handler);
+        const h = () => setImgOpen(true);
+        window.addEventListener("wiki:open-image-modal", h);
+        return () => window.removeEventListener("wiki:open-image-modal", h);
     }, []);
-
     useEffect(() => {
-        const handler = () => setStickerOpen(true);
-        window.addEventListener("wiki:open-sticker-modal", handler);
-        return () => window.removeEventListener("wiki:open-sticker-modal", handler);
+        const h = () => setStickerOpen(true);
+        window.addEventListener("wiki:open-sticker-modal", h);
+        return () => window.removeEventListener("wiki:open-sticker-modal", h);
     }, []);
 
     const handleImageModalClose = useCallback(() => {
@@ -148,23 +159,15 @@ export default function App() {
     const handleImageApply = useCallback(
         (base64: string, mimeType: string, fileName: string) => {
             if (!editor) return;
-            editor.chain()
-                .focus()
-                .insertEmbedMedia({
-                    kind:      "image",
-                    src:       base64,
-                    mime_type: mimeType,
-                    file_name: fileName,
-                    alt:       fileName,
-                })
-                .run();
-        },
-        [editor],
+            editor.chain().focus().insertEmbedMedia({
+                kind: "image", src: base64, mime_type: mimeType,
+                file_name: fileName, alt: fileName,
+            }).run();
+        }, [editor],
     );
 
     const handleAddComment = useCallback(() => {
-        if (!editor) return;
-        if (editor.state.selection.empty) return;
+        if (!editor || editor.state.selection.empty) return;
         setComposerOpen(o => !o);
     }, [editor]);
 
@@ -179,102 +182,176 @@ export default function App() {
         if (!editor) return;
         const range = findThreadRange(editor, threadId);
         if (!range) return;
-
-        // Устанавливаем выделение текста
         editor.chain().focus().setTextSelection(range).run();
-
-        // TipTap's scrollIntoView() не работает с кастомным scroll-контейнером
-        // (.ui-shell__content). Используем нативный DOM scrollIntoView.
         requestAnimationFrame(() => {
             try {
                 const domPos = editor.view.domAtPos(range.from);
-                const node = domPos.node instanceof Element
-                    ? domPos.node
-                    : domPos.node.parentElement;
+                const node = domPos.node instanceof Element ? domPos.node : domPos.node.parentElement;
                 node?.scrollIntoView({ behavior: "smooth", block: "center" });
             } catch { /* view мог разрушиться */ }
         });
     }, [editor, setActiveThreadId]);
 
+    // ── Page navigation ───────────────────────────────────────────────────────
+    const handleNavigate = useCallback((id: string) => {
+        pagesStore.setCurrentId(id);
+        setRightPanel("comments");
+    }, []);
+
+    // ── Snapshot ──────────────────────────────────────────────────────────────
+    const handleCreateSnapshot = useCallback(() => {
+        if (!currentPage) return;
+        const label = prompt("Название версии:", `Версия ${new Date().toLocaleDateString("ru-RU")}`);
+        if (label === null) return;
+        historyStore.createSnapshot(pageId, ydoc, label || undefined);
+    }, [pageId, currentPage]);
+
+    // ── Toolbar / tabs / panels ───────────────────────────────────────────────
     const toolbar = (
-        <EditorToolbar
-            editor={editor}
-            onInsertImage={handleInsertImage}
-            onAddComment={handleAddComment}
-        />
+        <EditorToolbar editor={editor} onInsertImage={handleInsertImage} onAddComment={handleAddComment}/>
     );
 
     const tabs = (
         <>
-            <PresenceAvatars />
+            <PresenceAvatars/>
             <select
                 value={currentUser.id}
                 onChange={e => changeCurrentUser(e.target.value)}
                 style={{
-                    fontSize: "var(--fs-sm)",
-                    padding: "2px 6px",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: "var(--radius-sm)",
-                    background: "var(--bg-surface)",
-                    color: "var(--text-primary)",
-                    cursor: "pointer",
+                    fontSize: "var(--fs-sm)", padding: "2px 6px",
+                    border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)",
+                    background: "var(--bg-surface)", color: "var(--text-primary)", cursor: "pointer",
                 }}
                 onClick={e => e.stopPropagation()}
             >
-                {getAllUsers().map(u => (
-                    <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
+                {getAllUsers().map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
-            <a style={{cursor: "pointer", color: "var(--accent)"}}
-               onClick={() => setHistoryOpen(o => !o)}>Комментарии</a>
-            <a style={{cursor: "pointer"}}>Машина времени</a>
-            <a style={{cursor: "pointer", color: "var(--text-tertiary)"}}
-               onClick={() => {
-                   clearAll();
-                   window.location.reload();
-               }}>Сбросить</a>
+
+            <a style={{cursor:"pointer", color: rightPanel==="comments" ? "var(--accent)" : undefined}}
+               onClick={() => setRightPanel(p => p === "comments" ? null : "comments")}>
+                💬 Комментарии
+            </a>
+            <a style={{cursor:"pointer", color: rightPanel==="backlinks" ? "var(--accent)" : undefined}}
+               onClick={() => setRightPanel(p => p === "backlinks" ? null : "backlinks")}>
+                🔗 Ссылки {incomingLinks.length > 0 && `(${incomingLinks.length})`}
+            </a>
+            <a style={{cursor:"pointer", color: rightPanel==="history" ? "var(--accent)" : undefined}}
+               onClick={() => setRightPanel(p => p === "history" ? null : "history")}>
+                🕐 История
+            </a>
+            <a style={{cursor:"pointer", color:"var(--text-tertiary)"}}
+               onClick={() => { clearAll(pageId); window.location.reload(); }}>
+                Сбросить
+            </a>
         </>
     );
 
-    const sidePanel = historyOpen && (
-        <SidePanel open onClose={() => setHistoryOpen(false)} title="История комментариев"
-                   subtitle={`Всего тредов: ${visibleThreads.length}`}
-                   ref={sidePanelRef}>
-            {visibleThreads.length === 0 && (
-                <div style={{color: "var(--text-tertiary)", fontSize: "var(--fs-sm)", padding: "var(--space-3) 0"}}>
-                    Выделите текст в документе и нажмите 💬, чтобы оставить комментарий.
-                </div>
-            )}
-            {visibleThreads.map((t, i) => (
-                <ThreadCard
-                    key={t.id}
-                    thread={t}
-                    colorIndex={((i % 4) + 1) as 1 | 2 | 3 | 4}
-                    active={activeThreadId === t.id}
-                    onSelect={() => handleThreadSelect(t.id)}
-                    onDelete={() => handleDeleteThread(t.id)}
+    // ── Right side panel ──────────────────────────────────────────────────────
+    let sidePanel: React.ReactNode = null;
+
+    if (rightPanel === "comments") {
+        sidePanel = (
+            <SidePanel open onClose={() => setRightPanel(null)}
+                       title="Комментарии"
+                       subtitle={`Всего тредов: ${visibleThreads.length}`}
+                       ref={sidePanelRef}>
+                {visibleThreads.length === 0 && (
+                    <div style={{color:"var(--text-tertiary)",fontSize:"var(--fs-sm)",padding:"var(--space-3) 0"}}>
+                        Выделите текст и нажмите 💬 чтобы оставить комментарий.
+                    </div>
+                )}
+                {visibleThreads.map((t, i) => (
+                    <ThreadCard
+                        key={t.id} thread={t}
+                        colorIndex={((i % 4) + 1) as 1|2|3|4}
+                        active={activeThreadId === t.id}
+                        onSelect={() => handleThreadSelect(t.id)}
+                        onDelete={() => handleDeleteThread(t.id)}
+                    />
+                ))}
+            </SidePanel>
+        );
+    } else if (rightPanel === "backlinks") {
+        sidePanel = (
+            <SidePanel open onClose={() => setRightPanel(null)}
+                       title="Обратные ссылки"
+                       subtitle={`Страниц ссылается: ${incomingLinks.length}`}>
+                {incomingLinks.length === 0 ? (
+                    <div style={{color:"var(--text-tertiary)",fontSize:"var(--fs-sm)",padding:"var(--space-3) 0"}}>
+                        Ни одна страница не ссылается на эту.
+                        Используйте /страница в редакторе для вставки ссылок.
+                    </div>
+                ) : (
+                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                        {incomingLinks.map(link => (
+                            <div key={link.id}
+                                 onClick={() => handleNavigate(link.fromId)}
+                                 style={{
+                                     padding:"10px 12px",
+                                     background:"var(--bg-surface)",
+                                     borderRadius:"var(--radius-sm)",
+                                     cursor:"pointer",
+                                     border:"1px solid var(--border-default)",
+                                     transition:"border-color 0.12s",
+                                 }}
+                                 onMouseEnter={e=>(e.currentTarget.style.borderColor="var(--accent)")}
+                                 onMouseLeave={e=>(e.currentTarget.style.borderColor="var(--border-default)")}
+                            >
+                                <div style={{fontWeight:500,fontSize:"var(--fs-sm)",color:"var(--text-primary)"}}>
+                                    📄 {link.fromTitle}
+                                </div>
+                                <div style={{fontSize:"var(--fs-xs)",color:"var(--text-tertiary)",marginTop:2}}>
+                                    {new Date(link.createdAt).toLocaleDateString("ru-RU")}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </SidePanel>
+        );
+    } else if (rightPanel === "history") {
+        sidePanel = (
+            <SidePanel open onClose={() => setRightPanel(null)} title="" subtitle="">
+                <VersionHistory
+                    pageId={pageId}
+                    onCreateSnapshot={handleCreateSnapshot}
+                    onClose={() => setRightPanel(null)}
                 />
-            ))}
-        </SidePanel>
-    );
+            </SidePanel>
+        );
+    }
 
     return (
         <ToolbarRefContext.Provider value={toolbarRefHandle}>
-            <PageShell toolbar={toolbar} rightTabs={tabs} sidePanel={sidePanel}
-                       footer={<EditorFooter editor={editor} saveStatus={saveStatus}/>}>
-                {loading ? <PageSkeleton/> : <EditorContent editor={editor}/>}
-            </PageShell>
+            <div style={{display:"flex",height:"100vh",overflow:"hidden"}}>
+                {/* Sidebar */}
+                <Sidebar
+                    currentPageId={pageId}
+                    onNavigate={handleNavigate}
+                    collapsed={sidebarCollapsed}
+                    onToggle={() => setSidebarCollapsed(c => !c)}
+                />
+
+                {/* Editor area */}
+                <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+                    <PageShell toolbar={toolbar} rightTabs={tabs} sidePanel={sidePanel}
+                               footer={<EditorFooter editor={editor} saveStatus={saveStatus}/>}>
+                        {loading
+                            ? <PageSkeleton/>
+                            : <EditorContent key={pageId} editor={editor}/>
+                        }
+                    </PageShell>
+                </div>
+            </div>
+
             <ImageModal open={imgOpen} onClose={handleImageModalClose} onApply={handleImageApply}/>
             <ImageModal open={stickerOpen} onClose={handleStickerModalClose} onApply={handleImageApply} title="Вставить стикер"/>
             <EmojiPickerPopover/>
             <SlashMenu/>
             <MentionMenu/>
             <TablePickerModal/>
-            <CommentComposer
-                editor={editor}
-                open={composerOpen}
-                onClose={() => setComposerOpen(false)}
-            />
+            <PagePickerModal/>
+            <CommentComposer editor={editor} open={composerOpen} onClose={() => setComposerOpen(false)}/>
         </ToolbarRefContext.Provider>
     );
 }
