@@ -55,3 +55,36 @@ export function connectCollab(pageId: string): void {
 }
 
 export const ROOM_NAME = "wiki-editor-v1"; // kept for backward compat
+
+// ── Workspace doc (shared pages list) ────────────────────────────────────────
+// Стабильный синглтон — никогда не переприсваивается, чтобы наблюдатели
+// в pagesStore оставались действительными.
+
+export const workspaceDoc: Y.Doc = new Y.Doc();
+let _workspaceProvider: HocuspocusProvider | null = null;
+
+/**
+ * Подключить workspace-документ к серверу.
+ * Вызывается один раз из App после монтирования (когда токен уже доступен).
+ * onSynced — коллбэк после первоначальной синхронизации с сервером.
+ */
+export function initWorkspaceProvider(onSynced: () => void): void {
+    _workspaceProvider?.destroy();
+    _workspaceProvider = new HocuspocusProvider({
+        url: WS_BASE,
+        name: "workspace",
+        document: workspaceDoc,
+        token: getAccessToken() ?? "",
+        onSynced: () => {
+            console.log("[collab] workspace synced");
+            onSynced();
+        },
+        onConnect:    () => console.log("[collab] workspace connected"),
+        onDisconnect: () => console.log("[collab] workspace disconnected"),
+        onAuthenticated: () => console.log("[collab] workspace authenticated"),
+        onAuthenticationFailed: ({ reason }: { reason: string }) =>
+            console.warn("[collab] workspace auth failed:", reason),
+        onClose: ({ event }: { event: CloseEvent }) =>
+            console.warn(`[collab] workspace ws closed  code=${event.code}`),
+    });
+}

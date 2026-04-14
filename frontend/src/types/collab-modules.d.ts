@@ -9,6 +9,10 @@ declare module "yjs" {
 
         getXmlFragment(name: string): XmlFragment;
 
+        getMap<T = unknown>(name: string): Map<T>;
+
+        transact(f: () => void): void;
+
         destroy(): void;
     }
 
@@ -17,9 +21,15 @@ declare module "yjs" {
     }
 
     export class Map<T = unknown> {
+        readonly size: number;
+
         get(key: string): T | undefined;
 
         set(key: string, value: T): void;
+
+        delete(key: string): void;
+
+        forEach(callback: (value: T, key: string) => void): void;
 
         observe(f: (event: unknown) => void): void;
     }

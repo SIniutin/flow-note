@@ -23,7 +23,7 @@ import {PresenceAvatars} from "./editor/collab/PresenceAvatars";
 import {EmojiPickerPopover} from "./editor/emoji/EmojiPickerPopover";
 import {Sidebar} from "./components/Sidebar";
 import {pagesStore, useCurrentPage} from "./data/pagesStore";
-import {connectCollab} from "./editor/collab/collabProvider";
+import {connectCollab, initWorkspaceProvider} from "./editor/collab/collabProvider";
 import {VersionHistory} from "./editor/history/VersionHistory";
 import {historyStore} from "./editor/history/historyStore";
 import {ydoc} from "./editor/collab/collabProvider";
@@ -42,6 +42,15 @@ export default function App() {
     // ── Страница ──────────────────────────────────────────────────────────────
     const currentPage = useCurrentPage();
     const pageId = currentPage?.id ?? "page-default";
+
+    // При первом монтировании: запускаем workspace-провайдер (синхронизация страниц)
+    // и переподключаем collab с актуальным JWT-токеном (токен мог отсутствовать
+    // при инициализации модуля до входа пользователя).
+    useEffect(() => {
+        connectCollab(pageId);
+        initWorkspaceProvider(() => pagesStore.onWorkspaceSynced());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // При смене страницы переподключаем collab
     const prevPageIdRef = useRef<string>(pageId);
