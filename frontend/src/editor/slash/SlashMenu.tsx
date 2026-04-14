@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Popover } from "../../components/ui/Popover";
 import { filterCommands } from "./commands";
 import { useSlashState, slashStore } from "./slashStore";
@@ -6,6 +7,13 @@ import "./slashMenu.css";
 export function SlashMenu() {
     const { open, query, clientRect, editor, range, selectedIndex } = useSlashState();
     const items = filterCommands(query);
+
+    const listRef = useRef<HTMLUListElement>(null);
+
+    useEffect(() => {
+        const el = listRef.current?.children[selectedIndex] as HTMLElement | undefined;
+        el?.scrollIntoView({ block: "nearest" });
+    }, [selectedIndex]);
 
     const anchor = clientRect ? { getBoundingClientRect: () => clientRect() ?? new DOMRect() } : null;
 
@@ -17,7 +25,7 @@ export function SlashMenu() {
 
     return (
         <Popover open={open && items.length > 0} onClose={() => slashStore.reset()} anchor={anchor}>
-            <ul className="slash-menu">
+            <ul className="slash-menu" ref={listRef}>
                 {items.map((item, i) => (
                     <li
                         key={item.title}

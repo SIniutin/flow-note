@@ -1,20 +1,32 @@
+// ─── src/editor/extensions.ts ────────────────────────────────────────────────
+// Все расширения редактора.
+// Схема узлов соответствует wikilive_editor_contract v1.
+
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import Image from "@tiptap/extension-image";
 import CharacterCount from "@tiptap/extension-character-count";
 import Collaboration from "@tiptap/extension-collaboration";
-import {SlashExtension} from "./slash/slashExtension";
-import {CommentMark} from "./comments/CommentMark";
-import "./comments/CommentMark.css";
-import {MentionNode} from "./mention/MentionNode";
-import "./mention/mentionNode.css";
-import {MentionExtension} from "./mention/mentionExtension";
-import {MwsTableExtension} from "./mwsTable/MwsTableExtension";
-import {ydoc, awareness} from "./collab/collabProvider";
-import "./collab/collab.css";
-import type {User} from "../data/users";
 
-export const AVATAR_COLORS: Record<1 | 2 | 3 | 4, string> = {
+import { BlockIdExtension }          from "./schema/BlockIdExtension";
+import { EmbedMediaExtension }       from "./schema/EmbedMediaExtension";
+import { PageLinkExtension }         from "./schema/PageLinkExtension";
+import { MediaInlineExtension }      from "./schema/MediaInlineExtension";
+import { TableOfContentsExtension }  from "./schema/TableOfContentsExtension";
+import "./schema/schema.css";
+
+import { SlashExtension }    from "./slash/slashExtension";
+import { CommentMark }       from "./comments/CommentMark";
+import "./comments/CommentMark.css";
+import { MentionNode }       from "./mention/MentionNode";
+import "./mention/mentionNode.css";
+import { MentionExtension }  from "./mention/mentionExtension";
+import { MwsTableExtension } from "./mwsTable/MwsTableExtension";
+
+import { ydoc, awareness } from "./collab/collabProvider";
+import "./collab/collab.css";
+import type { User } from "../data/users";
+
+export const AVATAR_COLORS: Record<1|2|3|4, string> = {
     1: "#6ad0d6",
     2: "#8b7cff",
     3: "#ffb347",
@@ -22,33 +34,45 @@ export const AVATAR_COLORS: Record<1 | 2 | 3 | 4, string> = {
 };
 
 export function createEditorExtensions(currentUser: User) {
-    // Обновляем awareness при каждом вызове (смена пользователя)
     awareness.setLocalStateField("user", {
-        name: currentUser.name,
+        name:  currentUser.name,
         color: AVATAR_COLORS[currentUser.colorIndex],
     });
 
     return [
-        // undoRedo: false — Collaboration extension управляет undo/redo через Yjs.
-        // Без этого TipTap выдаёт предупреждение о конфликте расширений.
-        StarterKit.configure({undoRedo: false}),
+        // ── StarterKit v3 ─────────────────────────────────────────────────
+        // Включает: paragraph, heading, blockquote, codeBlock, bulletList,
+        // orderedList, listItem, horizontalRule, bold, italic, strike,
+        // underline, code, link, dropcursor, gapcursor.
+        // undoRedo: false — Collaboration управляет undo/redo через Yjs.
+        StarterKit.configure({ undoRedo: false }),
 
         Placeholder.configure({
             placeholder: "Начните вводить содержимое или нажмите / чтобы использовать команды",
         }),
 
-        Image,
         CharacterCount,
 
-        // ── Совместное редактирование (Yjs) ───────────────────────────────
-        // CollaborationCursor убран: cursor-plugin из y-prosemirror несовместим
-        // с @tiptap/y-tiptap который использует Collaboration v3.
-        // Presence-аватары работают через awareness в PresenceAvatars.tsx.
-        Collaboration.configure({
-            document: ydoc,
-        }),
+        // ── Schema extensions ─────────────────────────────────────────────
+        // block_id для всех блоков
+        BlockIdExtension,
 
-        // ── Остальные расширения ──────────────────────────────────────────
+        // embed_media — заменяет @tiptap/extension-image
+        EmbedMediaExtension,
+
+        // page_link — внутренняя ссылка на вики-страницу
+        PageLinkExtension,
+
+        // media_inline — эмодзи, иконки, стикеры, инлайн-файлы
+        MediaInlineExtension,
+
+        // table_of_contents — автооглавление из заголовков
+        TableOfContentsExtension,
+
+        // ── Collaboration (Yjs) ───────────────────────────────────────────
+        Collaboration.configure({ document: ydoc }),
+
+        // ── App extensions ────────────────────────────────────────────────
         SlashExtension,
         CommentMark,
         MentionNode,

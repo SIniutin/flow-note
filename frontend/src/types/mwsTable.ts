@@ -1,4 +1,5 @@
 // ─── src/types/mwsTable.ts ─────────────────────────────────────────────────────
+// Типы согласованы со схемой wikilive_editor_contract v1.
 
 export type MwsColumnType =
     | "text"
@@ -31,11 +32,18 @@ export interface MwsTable {
     updatedAt: string;
 }
 
-/** Атрибуты, хранящиеся в atom-узле TipTap */
+/**
+ * Атрибуты узла mwsTable по схеме wikilive_editor_contract.
+ * dst_id соответствует MwsTable.id в tablesClient.
+ */
 export interface MwsTableNodeAttrs {
-    tableId: string;
-    viewMode: "compact" | "full" | "card";
-    pinnedColumns?: string[];
-    maxRows?: number;
-    caption?: string;
+    block_id:  string | null;
+    dst_id:    string | null;       // id таблицы (was: tableId)
+    view_id?:  string | null;
+    title?:    string | null;       // display title (was: caption)
+    display?:  "table" | "full" | "cards";  // render mode (was: viewMode)
+    maxRows?:  number;              // legacy
+    // Legacy aliases — kept for backward compat with old saved docs
+    viewMode?: "compact" | "full" | "card";
+    tableId?:  string | null;
 }

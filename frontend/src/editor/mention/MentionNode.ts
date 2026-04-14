@@ -1,11 +1,28 @@
-import { Node, mergeAttributes } from "@tiptap/core";
-import { getUserById } from "../../data/users";
+// ─── src/editor/mention/MentionNode.ts ───────────────────────────────────────
+// Инлайн-узел mention по схеме wikilive_editor_contract.
+// Attrs: id (entity id), label (display name без @), kind (user|team|group).
+// Обратная совместимость: parseHTML принимает data-user-id как id.
 
-export interface MentionOptions {
-    HTMLAttributes: Record<string, unknown>;
+import { Node, mergeAttributes } from "@tiptap/core";
+
+export type MentionKind = "user" | "team" | "group";
+
+export interface MentionAttrs {
+    id:    string | null;
+    label: string;
+    kind:  MentionKind;
 }
 
-export const MentionNode = Node.create<MentionOptions>({
+const COLOR_BY_SUFFIX: Record<string, 1|2|3|4> = {
+    u_ivan: 1, u_sergey: 2, u_anna: 3, u_dmitry: 4, u_elena: 1,
+};
+
+function colorIndex(id: string | null): 1|2|3|4 {
+    if (!id) return 2;
+    return COLOR_BY_SUFFIX[id] ?? ((id.charCodeAt(0) % 4) + 1 as 1|2|3|4);
+}
+
+export const MentionNode = Node.create({
     name: "mention",
     group: "inline",
     inline: true,
@@ -13,39 +30,58 @@ export const MentionNode = Node.create<MentionOptions>({
     selectable: true,
     draggable: false,
 
-    addOptions() { return { HTMLAttributes: {} }; },
-
     addAttributes() {
         return {
-            userId: {
+            id: {
                 default: null,
-                parseHTML: el => (el as HTMLElement).getAttribute("data-user-id"),
-                renderHTML: attrs => attrs.userId ? { "data-user-id": attrs.userId } : {},
+                // Обратная совместимость со старым data-user-id
+                parseHTML: el =>
+                    el.getAttribute("data-id") ??
+                    el.getAttribute("data-user-id") ?? null,
+                renderHTML: attrs => attrs.id ? { "data-id": attrs.id } : {},
+            },
+            label: {
+                default: "",
+                parseHTML: el =>
+                    el.getAttribute("data-label") ??
+                    el.textContent?.replace(/^@/, "") ?? "",
+                renderHTML: attrs => attrs.label ? { "data-label": attrs.label } : {},
+            },
+            kind: {
+                default: "user" as MentionKind,
+                parseHTML: el => (el.getAttribute("data-kind") as MentionKind) ?? "user",
+                renderHTML: attrs => ({ "data-kind": attrs.kind ?? "user" }),
             },
         };
     },
 
     parseHTML() {
-        return [{ tag: "span[data-mention][data-user-id]" }];
+        return [
+            { tag: "span[data-mention][data-id]" },
+            // legacy
+            { tag: "span[data-mention][data-user-id]" },
+        ];
     },
 
-    renderHTML({ node, HTMLAttributes }) {
-        const user = node.attrs.userId ? getUserById(node.attrs.userId) : null;
-        const label = user ? user.name : "Неизвестный пользователь";
-        const colorClass = user ? `ui-mention--${user.colorIndex}` : "ui-mention--1";
+    renderHTML({ node }) {
+        const { id, label, kind } = node.attrs as MentionAttrs;
+        const ci = colorIndex(id);
         return [
             "span",
             mergeAttributes(
-                { "data-mention": "", class: `ui-mention ${colorClass}` },
-                this.options.HTMLAttributes,
-                HTMLAttributes,
+                {
+                    "data-mention": "",
+                    "data-id": id ?? "",
+                    "data-label": label,
+                    "data-kind": kind ?? "user",
+                    class: `ui-mention ui-mention--${ci}`,
+                },
             ),
             `@${label}`,
         ];
     },
 
     renderText({ node }) {
-        const user = node.attrs.userId ? getUserById(node.attrs.userId) : null;
-        return user ? `@${user.name}` : "@unknown";
+        return `@${(node.attrs as MentionAttrs).label}`;
     },
 });

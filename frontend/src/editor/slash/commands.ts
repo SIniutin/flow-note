@@ -1,5 +1,6 @@
 import type { Editor, Range } from "@tiptap/core";
 import { mwsTableCommand } from "../mwsTable/mwsTableCommand";
+import { emojiPickerStore } from "../emoji/emojiPickerStore";
 
 export interface SlashCommand {
     title: string;
@@ -35,7 +36,41 @@ export const slashCommands: SlashCommand[] = [
         keywords: ["code", "код"],
         run: (e, r) => e.chain().focus().deleteRange(r).toggleCodeBlock().run(),
     },
+    {
+        title: "Оглавление",
+        description: "Автоматическое содержание из заголовков",
+        icon: "☰",
+        keywords: ["toc", "contents", "оглавление", "содержание", "навигация"],
+        run: (e, r) => e.chain().focus().deleteRange(r).insertTableOfContents().run(),
+    },
+    {
+        title: "Эмодзи",
+        description: "Вставить эмодзи из пикера",
+        icon: "😊",
+        keywords: ["emoji", "эмодзи", "смайл", "smile"],
+        run: (e, r) => emojiPickerStore.open(e, r),
+    },
     mwsTableCommand,
+    {
+        title: "Изображение",
+        description: "Вставить изображение или медиафайл",
+        icon: "🖼",
+        keywords: ["image", "изображение", "фото", "картинка", "embed", "media"],
+        run: (e, r) => {
+            e.chain().focus().deleteRange(r).run();
+            window.dispatchEvent(new CustomEvent("wiki:open-image-modal"));
+        },
+    },
+    {
+        title: "Стикер",
+        description: "Вставить стикер",
+        icon: "🎭",
+        keywords: ["sticker", "стикер", "gif", "анимация"],
+        run: (e, r) => {
+            e.chain().focus().deleteRange(r).run();
+            window.dispatchEvent(new CustomEvent("wiki:open-sticker-modal"));
+        },
+    },
 ];
 
 export function filterCommands(query: string): SlashCommand[] {

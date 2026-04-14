@@ -1,19 +1,15 @@
 // ─── src/editor/mwsTable/TablePickerModal.tsx ─────────────────────────────────
-// Модальный пикер таблиц. Использует готовый компонент Modal из ui/surfaces,
-// CSS-классы из tablePickerModal.css и дизайн-токены проекта.
-// Открывается / закрывается через tablePickerStore.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Modal } from "../../components/ui/surfaces";
 import { tablesClient } from "../../api/tablesClient";
 import { tablePickerStore, useTablePickerState } from "./tablePickerStore";
 import { useBacklinkCounts } from "./backlinksStore";
-import type { MwsTable, MwsTableNodeAttrs } from "../../types/mwsTable";
+import type { MwsTable } from "../../types/mwsTable";
 import "./tablePickerModal.css";
 
 type TableMeta = Omit<MwsTable, "rows">;
-
-// ── TablePickerModal ──────────────────────────────────────────────────────────
+type DisplayMode = "table" | "full" | "cards";
 
 export function TablePickerModal() {
     const { open, editor, range } = useTablePickerState();
@@ -24,29 +20,24 @@ export function TablePickerModal() {
     const [loading, setLoading] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [hoveredIndex, setHoveredIndex] = useState(0);
-    const [viewMode, setViewMode] = useState<MwsTableNodeAttrs["viewMode"]>("compact");
+    const [display, setDisplay] = useState<DisplayMode>("table");
     const [maxRows, setMaxRows] = useState(5);
 
     const searchRef = useRef<HTMLInputElement>(null);
-
-    // ── загрузка при открытии ─────────────────────────────────────────────────
 
     useEffect(() => {
         if (!open) return;
         setQuery("");
         setSelectedId(null);
         setHoveredIndex(0);
-        setViewMode("compact");
+        setDisplay("table");
         setMaxRows(5);
         setLoading(true);
         tablesClient.listTables()
             .then(setTables)
             .finally(() => setLoading(false));
-        // автофокус через кадр, после рендера Modal
         requestAnimationFrame(() => searchRef.current?.focus());
     }, [open]);
-
-    // ── живой поиск ───────────────────────────────────────────────────────────
 
     useEffect(() => {
         if (!open) return;
@@ -60,10 +51,7 @@ export function TablePickerModal() {
         return () => clearTimeout(tid);
     }, [query, open]);
 
-    // Reset hoveredIndex when list changes
     useEffect(() => { setHoveredIndex(0); }, [tables]);
-
-    // ── клавиатурная навигация ────────────────────────────────────────────────
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         if (e.key === "ArrowDown") {
@@ -77,26 +65,24 @@ export function TablePickerModal() {
             const t = tables[hoveredIndex];
             if (t) setSelectedId(prev => (prev === t.id ? null : t.id));
         }
-        // Escape закрывается через Modal
     }, [tables, hoveredIndex]);
-
-    // ── вставка ───────────────────────────────────────────────────────────────
 
     const handleInsert = useCallback(() => {
         if (!selectedId || !editor || !range) return;
         editor.chain().focus().deleteRange(range).insertMwsTable({
-            tableId: selectedId,
-            viewMode,
+            block_id: null,
+            dst_id:   selectedId,
+            display,
             maxRows,
         }).run();
         tablePickerStore.reset();
-    }, [selectedId, editor, range, viewMode, maxRows]);
+    }, [selectedId, editor, range, display, maxRows]);
 
     const handleClose = useCallback(() => {
         tablePickerStore.reset();
     }, []);
 
-    // ── footer ────────────────────────────────────────────────────────────────
+    const selectedTable = tables.find(t => t.id === selectedId);
 
     const footer = (
         <div className="tpm-foot">
@@ -118,8 +104,6 @@ export function TablePickerModal() {
         </div>
     );
 
-    const selectedTable = tables.find(t => t.id === selectedId);
-
     return (
         <Modal
             open={open}
@@ -129,13 +113,7 @@ export function TablePickerModal() {
             width={440}
             footer={footer}
         >
-            {/*
-              .ui-modal__body имеет padding: var(--space-5) = 20px.
-              Используем .tpm-body с отрицательными margin, чтобы search/list/opts
-              шли от края до края модального окна (full-bleed).
-            */}
             <div className="tpm-body">
-                {/* Поиск */}
                 <div className="tpm-search" onKeyDown={handleKeyDown}>
                     <span className="tpm-search__icon">🔍</span>
                     <input
@@ -149,7 +127,6 @@ export function TablePickerModal() {
                     />
                 </div>
 
-                {/* Список */}
                 <ul className="tpm-list" onKeyDown={handleKeyDown}>
                     {loading ? (
                         <li className="tpm-list__empty">Загрузка…</li>
@@ -170,7 +147,6 @@ export function TablePickerModal() {
                     )}
                 </ul>
 
-                {/* Опции отображения — только если выбрана таблица */}
                 {selectedTable && (
                     <div className="tpm-opts">
                         <div className="tpm-opts__label">
@@ -179,13 +155,13 @@ export function TablePickerModal() {
                         <div className="tpm-opts__row">
                             <span className="tpm-opts__key">Вид</span>
                             <div className="tpm-seg">
-                                {(["compact", "full", "card"] as const).map(m => (
+                                {(["table", "full", "cards"] as const).map(m => (
                                     <button
                                         key={m}
-                                        className={`tpm-seg__btn${viewMode === m ? " is-active" : ""}`}
-                                        onClick={() => setViewMode(m)}
+                                        className={`tpm-seg__btn${display === m ? " is-active" : ""}`}
+                                        onClick={() => setDisplay(m)}
                                     >
-                                        {m.charAt(0).toUpperCase() + m.slice(1)}
+                                        {m === "table" ? "Compact" : m === "full" ? "Full" : "Cards"}
                                     </button>
                                 ))}
                             </div>
@@ -207,8 +183,6 @@ export function TablePickerModal() {
         </Modal>
     );
 }
-
-// ── TableItem ─────────────────────────────────────────────────────────────────
 
 function TableItem({
     table, hovered, selected, backlinkCount, onHover, onToggle,
@@ -240,14 +214,9 @@ function TableItem({
                         <span className="tpm-item__desc">{table.description}</span>
                     )}
                 </span>
-                <span className="tpm-item__meta">
-                    {table.columns.length} кол.
-                </span>
+                <span className="tpm-item__meta">{table.columns.length} кол.</span>
                 {backlinkCount > 0 && (
-                    <span
-                        className="tpm-item__links"
-                        title={`Используется в ${backlinkCount} документах`}
-                    >
+                    <span className="tpm-item__links" title={`Используется в ${backlinkCount} документах`}>
                         📎 {backlinkCount}
                     </span>
                 )}
