@@ -8,9 +8,8 @@ COPY auth-service/go.mod auth-service/go.sum ./
 RUN go mod download
 
 COPY auth-service/cmd ./cmd
+COPY auth-service/db ./db
 COPY auth-service/internal ./internal
-COPY auth-service/migrations ./migrations
-COPY auth-service/google ./google
 COPY auth-service/README.md ./README.md
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/auth-service ./cmd/auth-service

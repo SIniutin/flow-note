@@ -2,10 +2,11 @@ package grpcauth
 
 import (
 	"context"
-	"pages-service/common/authsecurity"
 
-	"pages-service/common/authctx"
-	"pages-service/common/httpauth"
+	"github.com/flow-note/common/authsecurity"
+
+	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/httpauth"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

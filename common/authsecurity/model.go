@@ -9,6 +9,6 @@ type Verifier interface {
 }
 
 type Issuer interface {
-	NewAccess(userID string, role string) (token string, exp time.Time, err error)
+	NewAccess(userID string) (token string, exp time.Time, err error)
 	NewRefresh() (token string, hash []byte, err error)
 }

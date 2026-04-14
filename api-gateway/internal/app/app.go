@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"strings"
 
-	authpb "github.com/flow-note/api-contracts/generated/auth/v1"
+	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
 	"github.com/flow-note/api-gateway/internal/handlers"
 	"github.com/flow-note/api-gateway/internal/middleware"
+	"github.com/flow-note/common/authsecurity"
+	"github.com/flow-note/common/httpauth"
+	cr "github.com/flow-note/common/runtime"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	sec "github.com/tasker-iniutin/common/authsecurity"
-	"github.com/tasker-iniutin/common/httpauth"
-	cr "github.com/tasker-iniutin/common/runtime"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -33,16 +33,16 @@ func (a *App) Run(ctx context.Context) error {
 	}
 	defer cleanup()
 
-	pub, err := sec.LoadRSAPublicKeyFromPEMFile(a.cfg.PublicKeyPath)
+	pub, err := authsecurity.LoadRSAPublicKeyFromPEMFile(a.cfg.PublicKeyPath)
 	if err != nil {
 		logger.Error("failed to load public key", zap.String("path", a.cfg.PublicKeyPath), zap.Error(err))
 		return err
 	}
-	verifier := sec.NewRS256Verifier(pub, a.cfg.JWTIssuer, a.cfg.JWTAudience)
+	verifier := authsecurity.NewRS256Verifier(pub, a.cfg.JWTIssuer, a.cfg.JWTAudience)
 
 	grpcgw := runtime.NewServeMux(
 		runtime.WithMetadata(func(ctx context.Context, r *http.Request) metadata.MD {
-			if token := httpauth.TokenFromRequest(r); token != "" {
+			if token := httpauth.ExtractAccessToken(r); token != "" {
 				return metadata.Pairs("authorization", "Bearer "+token)
 			}
 			return nil

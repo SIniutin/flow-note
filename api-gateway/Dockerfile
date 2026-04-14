@@ -4,6 +4,7 @@ WORKDIR /src
 
 # api-gateway has a replace directive: github.com/flow-note/api-contracts => ../api-contracts
 COPY api-contracts/ /src/api-contracts/
+COPY common/ /src/common/
 
 WORKDIR /src/api-gateway
 COPY api-gateway/go.mod api-gateway/go.sum ./

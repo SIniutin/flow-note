@@ -45,7 +45,7 @@ type Comment struct {
 	DeletedAt *time.Time
 }
 
-func NewComment(now time.Time, cmd CreateCommentRequest) (Comment, error) {
+func NewComment(now time.Time, cmd CreateCommentCommand) (Comment, error) {
 	if err := cmd.Validate(); err != nil {
 		return Comment{}, err
 	}
@@ -172,7 +172,7 @@ func (s *CommentSubscription) Deactivate(now time.Time) {
 	s.UpdatedAt = now.UTC()
 }
 
-type CreateCommentRequest struct {
+type CreateCommentCommand struct {
 	UserID   uuid.UUID
 	ParentID *uuid.UUID
 	PageID   uuid.UUID
@@ -180,7 +180,7 @@ type CreateCommentRequest struct {
 	Body     string
 }
 
-func (c *CreateCommentRequest) Validate() error {
+func (c CreateCommentCommand) Validate() error {
 	switch {
 	case c.UserID == uuid.Nil:
 		return ErrInvalidUserID

@@ -7,9 +7,8 @@ import (
 	"testing"
 
 	d "github.com/flow-note/auth-service/internal/domain"
-	"github.com/flow-note/common/runtime/postgres"
+	"github.com/flow-note/common/postgres"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestUserRepoCreateAndRead(t *testing.T) {
@@ -106,11 +105,10 @@ func openAuthTestDB(t *testing.T) *postgres.DB {
 		t.Skip("AUTH_TEST_DATABASE_URL or DATABASE_URL is not set")
 	}
 
-	pool, err := pgxpool.New(context.Background(), dsn)
+	db, err := postgres.New(context.Background(), dsn)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	db := &postgres.DB{Pool: pool}
 	t.Cleanup(func() { db.Close() })
 
 	setupAuthSchema(t, db)

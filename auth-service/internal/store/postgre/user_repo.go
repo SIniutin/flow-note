@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	d "github.com/flow-note/auth-service/internal/domain"
-	"github.com/flow-note/common/runtime/postgres"
+	"github.com/flow-note/common/postgres"
 	"github.com/google/uuid"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type userRepoImpl struct {

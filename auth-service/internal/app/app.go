@@ -2,22 +2,22 @@ package app
 
 import (
 	"context"
+	"net"
 	"time"
 
-	authpb "github.com/flow-note/api-contracts/generated/auth/v1"
-	sec "github.com/flow-note/common/authsecurity"
-	"github.com/flow-note/common/runtime/grpcserver"
-	"github.com/flow-note/common/runtime/logging"
-	"github.com/flow-note/common/runtime/postgres"
-	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
-
+	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
+	"github.com/flow-note/auth-service/db"
 	"github.com/flow-note/auth-service/internal/store/postgre"
 	redrepo "github.com/flow-note/auth-service/internal/store/redis"
 	handlergrpc "github.com/flow-note/auth-service/internal/transport/grpc"
 	"github.com/flow-note/auth-service/internal/usecase"
+	sec "github.com/flow-note/common/authsecurity"
+	commonpg "github.com/flow-note/common/postgres"
+	commonruntime "github.com/flow-note/common/runtime"
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 type App struct {
@@ -29,19 +29,20 @@ func New(cfg Config) *App {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	logger, err := logging.New("info")
+	logger, _, err := commonruntime.NewLogger()
 	if err != nil {
 		return err
 	}
 	defer func() { _ = logger.Sync() }()
 
-	db, err := postgres.New(ctx, a.cfg.DatabaseURL)
+	dbPool, err := commonpg.New(ctx, a.cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
+	defer dbPool.Close()
 
-	userRepo := postgre.NewPostgreRepo(db)
+	db.SetupPostgres(dbPool.Pool, logger)
+	userRepo := postgre.NewPostgreRepo(dbPool)
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     a.cfg.RedisAddr,
@@ -65,21 +66,20 @@ func (a *App) Run(ctx context.Context) error {
 	logoutUC := usecase.NewLogoutUser(sessionRepo)
 
 	handler := handlergrpc.NewServer(regUser, logUser, refreshUC, logoutUC)
-	grpcSrv, err := grpcserver.New(
-		a.cfg.GRPCAddr,
-		grpc.UnaryInterceptor(recoveryUnaryServerInterceptor(logger)),
-	)
+
+	srv := grpc.NewServer(grpc.UnaryInterceptor(recoveryUnaryServerInterceptor(logger)))
+	authpb.RegisterAuthServiceServer(srv, handler)
+	if a.cfg.EnableReflection {
+		reflection.Register(srv)
+	}
+
+	lis, err := net.Listen("tcp", a.cfg.GRPCAddr)
 	if err != nil {
 		return err
 	}
-	authpb.RegisterAuthServiceServer(grpcSrv.Inner(), handler)
-	if a.cfg.EnableReflection {
-		reflection.Register(grpcSrv.Inner())
-	}
 
 	logger.Info("auth-service gRPC listening", zap.String("addr", a.cfg.GRPCAddr))
-	logger.Info(
-		"auth-service jwt config:",
+	logger.Info("auth-service jwt config:",
 		zap.String("private_key_path", a.cfg.PrivateKeyPath),
 		zap.String("issuer", a.cfg.JWTIssuer),
 		zap.String("audience", a.cfg.JWTAudience),
@@ -89,7 +89,7 @@ func (a *App) Run(ctx context.Context) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- grpcSrv.Serve()
+		errCh <- srv.Serve(lis)
 	}()
 
 	select {
@@ -101,7 +101,7 @@ func (a *App) Run(ctx context.Context) error {
 
 		done := make(chan struct{})
 		go func() {
-			grpcSrv.GracefulStop()
+			srv.GracefulStop()
 			close(done)
 		}()
 

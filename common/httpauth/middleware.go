@@ -2,9 +2,10 @@ package httpauth
 
 import (
 	"net/http"
-	"pages-service/common/authsecurity"
 
-	"pages-service/common/authctx"
+	"github.com/flow-note/common/authsecurity"
+
+	"github.com/flow-note/common/authctx"
 )
 
 const AccessTokenCookieName = "access_token"

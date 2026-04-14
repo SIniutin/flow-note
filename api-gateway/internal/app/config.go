@@ -1,6 +1,6 @@
 package app
 
-import "github.com/tasker-iniutin/common/configenv"
+import "github.com/flow-note/common/configenv"
 
 type Config struct {
 	HTTPAddr      string

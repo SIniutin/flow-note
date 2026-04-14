@@ -3,10 +3,10 @@ package app
 import (
 	"net"
 
-	notifyv1 "github.com/flow-note/api-contracts/generated/notify/v1"
+	notifyv1 "github.com/flow-note/api-contracts/generated/proto/notify/v1"
+	commonruntime "github.com/flow-note/common/runtime"
 	"github.com/flow-note/notify-service/internal/config"
 	grpcHandler "github.com/flow-note/notify-service/internal/transport/grpc"
-	commonruntime "github.com/flow-note/common/runtime"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"

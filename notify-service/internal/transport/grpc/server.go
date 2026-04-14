@@ -3,7 +3,7 @@ package grpc
 import (
 	"context"
 
-	notifyv1 "github.com/flow-note/api-contracts/generated/notify/v1"
+	notifyv1 "github.com/flow-note/api-contracts/generated/proto/notify/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"

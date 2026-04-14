@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/flow-note/common/apperrors"
-	commonpg "github.com/flow-note/common/runtime/postgres"
+	commonpg "github.com/flow-note/common/postgres"
 	"github.com/flow-note/notify-service/internal/domain"
 	"github.com/google/uuid"
 )
@@ -19,7 +19,7 @@ func NewPostgres(db *commonpg.DB) *Postgres {
 }
 
 func (p *Postgres) SaveEventNotifications(ctx context.Context, event domain.ProcessedEvent, items []domain.Notification) (bool, error) {
-	tx, err := p.db.Begin(ctx)
+	tx, err := p.db.Pool.Begin(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -65,7 +65,7 @@ func (p *Postgres) ListByUser(ctx context.Context, userID uuid.UUID, unreadOnly 
 	}
 	query += ` ORDER BY created_at DESC LIMIT $2 OFFSET $3`
 	args = append(args, limit, offset)
-	rows, err := p.db.Query(ctx, query, args...)
+	rows, err := p.db.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
