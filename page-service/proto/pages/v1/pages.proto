@@ -1,0 +1,385 @@
+syntax = "proto3";
+
+package pages.v1;
+
+option go_package = "pages-service/generated/pages/v1;pagesv1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "validate/validate.proto";
+
+service PagesService {
+  // Page
+  rpc CreatePage(CreatePageRequest) returns (CreatePageResponse) {
+    option (google.api.http) = {
+      post: "/v1/pages"
+      body: "*"
+    };
+  }
+  rpc GetPage(GetPageRequest) returns (GetPageResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}"
+    };
+  }
+  rpc UpdatePage(UpdatePageRequest) returns (UpdatePageResponse);
+  rpc DeletePage(DeletePageRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/pages/{page_id}"
+    };
+  }
+  rpc ListMyPages(ListMyPagesRequest) returns (ListMyPagesResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/my"
+    };
+  }
+  rpc ListAllowedPages(ListAllowedPagesRequest) returns (ListAllowedPagesResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/allowed"
+    };
+  }
+
+  // Version
+  rpc GetCurrentVersion(GetCurrentVersionRequest) returns (GetCurrentVersionResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/versions/{version_id}"
+    };
+  }
+  rpc GetLastVersion(GetLastVersionRequest) returns (GetLastVersionResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/versions/latest"
+    };
+  }
+  rpc ListVersions(ListVersionsRequest) returns (ListVersionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/versions"
+    };
+  }
+
+  // Permissions
+  rpc GrantPagePermission(GrantPagePermissionRequest) returns (GrantPagePermissionResponse) {
+    option (google.api.http) = {
+      post: "/v1/pages/{page_id}/permissions"
+      body: "*"
+    };
+  }
+  rpc RevokePagePermission(RevokePagePermissionRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      delete: "/v1/pages/{page_id}/permissions/{user_id}"
+    };
+  }
+  rpc UpdatePagePermission(UpdatePagePermissionRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {
+      patch: "/v1/pages/{page_id}/permissions/{user_id}"
+      body: "*"
+    };
+  }
+  rpc ListPagePermissions(ListPagePermissionsRequest) returns (ListPagePermissionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/permissions"
+    };
+  }
+  rpc GetMyPagePermission(GetMyPagePermissionRequest) returns (GetMyPagePermissionResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/permissions/me"
+    };
+  }
+
+  // Links / graph
+  rpc ReplacePageLinks(ReplacePageLinksRequest) returns (google.protobuf.Empty);
+  rpc GetPageConnected(GetPageConnectedRequest) returns (GetPageConnectedResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/connected"
+    };
+  }
+
+  // Mentions
+  rpc ReplacePageMentions(ReplacePageMentionsRequest) returns (google.protobuf.Empty);
+  rpc ListPageMentions(ListPageMentionsRequest) returns (ListPageMentionsResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/mentions"
+    };
+  }
+
+  // Tables embeds
+  rpc ReplacePageTables(ReplacePageTablesRequest) returns (google.protobuf.Empty);
+  rpc ListPageTables(ListPageTablesRequest) returns (ListPageTablesResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/tables"
+    };
+  }
+
+  // Media
+  rpc ReplacePageMedia(ReplacePageMediaRequest) returns (google.protobuf.Empty);
+  rpc ListPageMedia(ListPageMediaRequest) returns (ListPageMediaResponse) {
+    option (google.api.http) = {
+      get: "/v1/pages/{page_id}/media"
+    };
+  }
+}
+
+enum PagePermissionRole {
+  PAGE_PERMISSION_ROLE_UNSPECIFIED = 0;
+  PAGE_PERMISSION_ROLE_VIEWER = 1;
+  PAGE_PERMISSION_ROLE_EDITOR = 2;
+  PAGE_PERMISSION_ROLE_OWNER = 3;
+}
+
+enum MediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_IMAGE = 1;
+  MEDIA_TYPE_VIDEO = 2;
+  MEDIA_TYPE_FILE = 3;
+  MEDIA_TYPE_AUDIO = 4;
+}
+
+message Page {
+  string id = 1 [(validate.rules).string.uuid = true];
+  string title = 2 [(validate.rules).string = {min_len: 1, max_len: 512}];
+  string owner_id = 3 [(validate.rules).string.uuid = true];
+  int64 size = 4 [(validate.rules).int64.gte = 0];
+  int64 version = 6 [(validate.rules).int64.gte = 1];
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp deleted_at = 9;
+}
+
+message Version {
+  int64 id = 1 [(validate.rules).int64.gte = 1];
+  string page_id = 2 [(validate.rules).string.uuid = true];
+  string date = 3 [(validate.rules).string = {min_len: 1, max_len: 10485760}];
+  int64 size = 4 [(validate.rules).int64.gte = 0];
+}
+
+message PagePermission {
+  string id = 1 [(validate.rules).string.uuid = true];
+  string page_id = 2 [(validate.rules).string.uuid = true];
+  string user_id = 3 [(validate.rules).string.uuid = true];
+  PagePermissionRole role = 4 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+  string granted_by = 5 [(validate.rules).string.uuid = true, (validate.rules).string.ignore_empty = true];
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message PageLink {
+  string id = 1 [(validate.rules).string.uuid = true];
+  string from_page_id = 2 [(validate.rules).string.uuid = true];
+  string to_page_id = 3 [(validate.rules).string.uuid = true];
+  string block_id = 4 [(validate.rules).string.uuid = true];
+}
+
+message PageMention {
+  string id = 1 [(validate.rules).string.uuid = true];
+  string page_id = 2 [(validate.rules).string.uuid = true];
+  string user_id = 3 [(validate.rules).string.uuid = true];
+  string block_id = 4 [(validate.rules).string.uuid = true];
+}
+
+message PageTable {
+  string id = 1 [(validate.rules).string.uuid = true];
+  string page_id = 2 [(validate.rules).string.uuid = true];
+  string dst_id = 3 [(validate.rules).string = {min_len: 1, max_len: 255}];
+  string block_id = 4 [(validate.rules).string.uuid = true];
+}
+
+message PageMedia {
+  string id = 1 [(validate.rules).string.uuid = true];
+  string page_id = 2 [(validate.rules).string.uuid = true];
+  MediaType type = 4 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+  string block_id = 5 [(validate.rules).string.uuid = true];
+}
+
+message Pagination {
+  int32 limit = 1 [(validate.rules).int32 = {gte: 1, lte: 100}];
+  int32 offset = 2 [(validate.rules).int32.gte = 0];
+}
+
+message CreatePageRequest {
+  string title = 1 [(validate.rules).string = {min_len: 1, max_len: 512}];
+}
+
+message CreatePageResponse {
+  Page page = 1;
+}
+
+message GetPageRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message GetPageResponse {
+  Page page = 1;
+}
+
+message UpdatePageRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  string title = 2 [(validate.rules).string = {min_len: 1, max_len: 512}];
+  int64 size = 3 [(validate.rules).int64 = {gte: 0}];
+  string key_to_snapshot = 4 [(validate.rules).string = {min_len: 1, max_len:32}];
+}
+
+message UpdatePageResponse {
+  Page page = 1;
+}
+
+message DeletePageRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message ListMyPagesRequest {
+  Pagination pagination = 2 [(validate.rules).message.required = true];
+}
+
+message ListMyPagesResponse {
+  repeated Page pages = 1;
+}
+
+message ListAllowedPagesRequest {
+  Pagination pagination = 2 [(validate.rules).message.required = true];
+}
+
+message ListAllowedPagesResponse {
+  repeated Page pages = 1;
+}
+
+message GetCurrentVersionRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  int64 version_id = 2 [(validate.rules).int64.gte = 1];
+}
+
+message GetCurrentVersionResponse {
+  Version version = 1;
+}
+
+message GetLastVersionRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message GetLastVersionResponse {
+  Version version = 1;
+}
+
+message ListVersionsRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  Pagination pagination = 2 [(validate.rules).message.required = true];
+}
+
+message ListVersionsResponse {
+  repeated Version versions = 1;
+}
+
+message GrantPagePermissionRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  string user_id = 2 [(validate.rules).string.uuid = true];
+  PagePermissionRole role = 3 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+}
+
+message GrantPagePermissionResponse {
+  PagePermission permission = 1;
+}
+
+message RevokePagePermissionRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  string user_id = 2 [(validate.rules).string.uuid = true];
+}
+
+message UpdatePagePermissionRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  string user_id = 2 [(validate.rules).string.uuid = true];
+  PagePermissionRole role = 3 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+}
+
+message ListPagePermissionsRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message ListPagePermissionsResponse {
+  repeated PagePermission permissions = 1;
+}
+
+message GetMyPagePermissionRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message GetMyPagePermissionResponse {
+  PagePermission permission = 1;
+}
+
+message PageLinkInput {
+  string to_page_id = 1 [(validate.rules).string.uuid = true];
+  string block_id = 2 [(validate.rules).string.uuid = true];
+}
+
+message ReplacePageLinksRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  repeated PageLinkInput links = 2 [(validate.rules).repeated = {max_items: 10000}];
+}
+
+message GetPageConnectedRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message GetPageConnectedResponse {
+  repeated Page pages = 1;
+  repeated PageLink links = 2;
+}
+
+message ListPageGraphRequest {}
+
+message ListPageGraphResponse {
+  repeated Page pages = 1;
+  repeated PageLink links = 2;
+}
+
+message PageMentionInput {
+  string user_id = 1 [(validate.rules).string.uuid = true];
+  string block_id = 2 [(validate.rules).string.uuid = true];
+}
+
+message ReplacePageMentionsRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  repeated PageMentionInput mentions = 2 [(validate.rules).repeated = {max_items: 10000}];
+}
+
+message ListPageMentionsRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message ListPageMentionsResponse {
+  repeated PageMention mentions = 1;
+}
+
+message PageTableInput {
+  string dst_id = 1 [(validate.rules).string = {min_len: 1, max_len: 255}];
+  string block_id = 2 [(validate.rules).string.uuid = true];
+}
+
+message ReplacePageTablesRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  repeated PageTableInput tables = 2 [(validate.rules).repeated = {max_items: 10000}];
+}
+
+message ListPageTablesRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message ListPageTablesResponse {
+  repeated PageTable tables = 1;
+}
+
+message PageMediaInput {
+  MediaType type = 1 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
+  string block_id = 2 [(validate.rules).string.uuid = true];
+}
+
+message ReplacePageMediaRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+  repeated PageMediaInput media = 2 [(validate.rules).repeated = {max_items: 10000}];
+}
+
+message ListPageMediaRequest {
+  string page_id = 1 [(validate.rules).string.uuid = true];
+}
+
+message ListPageMediaResponse {
+  repeated PageMedia media = 1;
+}

@@ -102,9 +102,6 @@ func (v *rs256Verifier) VerifyAccess(tokenStr string) (userID string, role strin
 	if claims.Subject == "" {
 		return "", "", errors.New("missing sub")
 	}
-	if claims.Role == "" {
-		return "", "", errors.New("missing role")
-	}
 
 	return claims.Subject, claims.Role, nil
 }
