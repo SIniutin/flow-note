@@ -176,20 +176,6 @@ services:
       retries: 3
       start_period: 20s
 
-  # ── RabbitMQ ─────────────────────────────────────────────────────────────────
-  rabbitmq:
-    image: rabbitmq:3.13-management-alpine
-    restart: unless-stopped
-    ports:
-      - "5672:5672"
-      - "15672:15672"   # management UI: http://localhost:15672 (guest/guest)
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-
   # ── PostgreSQL (auth-service) ────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
@@ -202,6 +188,22 @@ services:
       - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── PostgreSQL (page-service) ───────────────────────────────────────────────
+  postgres-pages:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pages
+    volumes:
+      - postgres-pages-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -266,6 +268,39 @@ services:
       redis:
         condition: service_healthy
 
+  # ── Page Service ─────────────────────────────────────────────────────────────
+  page-service:
+    build:
+      context: .
+      dockerfile: pages_service/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "50051"
+      - "8080"
+    environment:
+      GRPC_PORT: "50051"
+      HTTP_PORT: "8080"
+      DB_HOST: "postgres-pages"
+      DB_PORT: "5432"
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres"
+      DB_NAME: "pages"
+      DB_SSLMODE: "disable"
+      JWT_PUBLIC_KEY: |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvZQPaK71ljRwv8ZfZkJn
+        7PoQAesa3c1SrwNaioUYRTSPrpcwvmyPtx6IbfTIARsEXjNTnkgbYQ9+3tqZyrZN
+        D1R+cJQkL8aDEkdgXHAgh/6bg2M1jV8qcbIBTFGXiMI/CmJGHbkBhz8arm1Wmj8C
+        g2dY0uhafN2rFGlGe90Bi3wXY463lKikF/an8fUnszqaB5y0dtZwkDZhMa7x/oU1
+        LbN06I9IY+f9jAH4GePkPyR+X0P80LSvBT62bVNan1e+dfceFrn04B8p8aWLPsN8
+        DtCrOJAHlTzXNmB4CgzgnqsIOG0cdJCzv8CC7QN2OkRunIFqBV7ljaH7AjY1HuEv
+        UQIDAQAB
+        -----END PUBLIC KEY-----
+      JWT_ISSUER: "flow-note-auth"
+      JWT_AUDIENCE: "flow-note-api"
+    depends_on:
+      postgres-pages:
+        condition: service_healthy
 
   # ── Comment Service ───────────────────────────────────────────────────────────
   comment-service:
@@ -325,15 +360,15 @@ services:
       S3_BUCKET: "snapshots"
       S3_ACCESS_KEY: "minioadmin"
       S3_SECRET_KEY: "minioadmin"
-      PAGES_GRPC_ADDR: "mock-pages:50051"
+      PAGES_GRPC_ADDR: "page-service:50051"
       WORKER_CONCURRENCY: "4"
     depends_on:
       kafka:
         condition: service_healthy
       minio:
         condition: service_healthy
-      mock-pages:
-        condition: service_healthy
+      page-service:
+        condition: service_started
 
   # ── API Gateway (nginx) ──────────────────────────────────────────────────────
   api-gateway:
@@ -360,14 +395,23 @@ services:
       collab-service:
         condition: service_healthy
 
-secrets:
-  jwt_private_key:
-    file: ./secrets/jwt_private_key.pem
-  jwt_public_key:
-    file: ./secrets/jwt_public_key.pem
+  # ── RabbitMQ ─────────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # management UI: http://localhost:15672 (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
 volumes:
   postgres-data:
+  postgres-pages-data:
   postgres-comment-data:
   postgres-notify-data:
   minio-data:          # Y.Doc snapshots (binary blobs)
