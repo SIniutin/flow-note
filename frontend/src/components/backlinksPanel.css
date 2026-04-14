@@ -1,0 +1,198 @@
+/* ─── Backlinks Panel ────────────────────────────────────────────────────────── */
+
+.bl {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    animation: ui-slide var(--dur-md) var(--ease);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────────── */
+
+.bl__head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 12px 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.bl__head-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.bl__head-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.bl__title {
+    font-size: var(--fs-md);
+    font-weight: var(--fw-semibold);
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.bl__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--bg-surface-muted);
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+}
+
+.bl__close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-xs);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: color 0.1s, background 0.1s;
+    flex-shrink: 0;
+}
+
+.bl__close-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface-muted);
+}
+
+.bl__subtitle {
+    font-size: var(--fs-sm);
+    color: var(--text-tertiary);
+    margin: 0;
+    line-height: 1.4;
+}
+
+.bl__kbd {
+    display: inline;
+    font-family: var(--font-mono, monospace);
+    font-size: 10px;
+    padding: 1px 4px;
+    background: var(--bg-surface-muted);
+    border: 1px solid var(--border-default);
+    border-radius: 3px;
+    color: var(--accent);
+}
+
+/* ── List ─────────────────────────────────────────────────────────────────────── */
+
+.bl__list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+}
+
+.bl__list::-webkit-scrollbar { width: 4px; }
+.bl__list::-webkit-scrollbar-track { background: transparent; }
+.bl__list::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 2px;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────────── */
+
+.bl__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 28px 16px;
+    color: var(--text-tertiary);
+    font-size: var(--fs-md);
+    text-align: center;
+    line-height: 1.5;
+}
+
+.bl__empty svg {
+    opacity: 0.35;
+    margin-bottom: 4px;
+    width: 22px;
+    height: 22px;
+}
+
+/* ── Backlink item ────────────────────────────────────────────────────────────── */
+
+.bl__item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    background: none;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.1s, border-color 0.1s;
+}
+
+.bl__item:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent-muted, rgba(124,92,255,0.3));
+}
+
+.bl__item-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.bl__item-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.bl__item-title {
+    font-size: var(--fs-md);
+    font-weight: var(--fw-medium);
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bl__item-date {
+    font-size: var(--fs-sm);
+    color: var(--text-tertiary);
+}
+
+.bl__item-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.1s, color 0.1s;
+}
+
+.bl__item:hover .bl__item-arrow {
+    opacity: 1;
+    color: var(--accent);
+}

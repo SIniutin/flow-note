@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import "./layout.css";
 
 interface AvatarProps {
@@ -48,26 +48,94 @@ export const Comment: React.FC<CommentProps> = ({
 );
 
 interface PageShellProps {
-    title?: string;
-    description?: string;
-    toolbar?: React.ReactNode;
-    rightTabs?: React.ReactNode;
-    sidePanel?: React.ReactNode;
-    footer?: React.ReactNode;
-    children: React.ReactNode;
+    title?:               string;
+    description?:         string;
+    icon?:                string;
+    onTitleChange?:       (v: string) => void;
+    onDescriptionChange?: (v: string) => void;
+    toolbar?:             React.ReactNode;
+    rightTabs?:           React.ReactNode;
+    sidePanel?:           React.ReactNode;
+    footer?:              React.ReactNode;
+    children:             React.ReactNode;
+}
+
+function EditableField({
+    value, placeholder, onSave, className, multiline = false,
+}: {
+    value: string;
+    placeholder: string;
+    onSave: (v: string) => void;
+    className: string;
+    multiline?: boolean;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft]     = useState(value);
+    const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+
+    const open = () => { setDraft(value); setEditing(true); setTimeout(() => ref.current?.select(), 10); };
+    const save = () => { setEditing(false); onSave(draft); };
+    const cancel = () => { setEditing(false); setDraft(value); };
+
+    if (editing) {
+        const props = {
+            ref,
+            className: `${className} ${className}--editing`,
+            value: draft,
+            placeholder,
+            onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(e.target.value),
+            onBlur: save,
+            onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === "Enter" && !multiline) { e.preventDefault(); save(); }
+                if (e.key === "Escape") { e.preventDefault(); cancel(); }
+            },
+        };
+        return multiline
+            ? <textarea {...props} rows={2}/>
+            : <input {...props} type="text"/>;
+    }
+
+    return (
+        <div className={`${className} ${className}--view`} onClick={open} title="Нажмите чтобы изменить">
+            {value || <span className={`${className}--placeholder`}>{placeholder}</span>}
+        </div>
+    );
 }
 
 export const PageShell: React.FC<PageShellProps> = ({
-                                                        title = "Новая страница", description = "Добавить описание",
-                                                        toolbar, rightTabs, sidePanel, footer, children,
-                                                    }) => (
+    title = "Без названия",
+    description,
+    icon = "📄",
+    onTitleChange,
+    onDescriptionChange,
+    toolbar, rightTabs, sidePanel, footer, children,
+}) => (
     <div className="ui-shell">
         <header className="ui-shell__head">
             <div className="ui-shell__title">
-                <span className="ui-shell__icon">📄</span>
-                <div>
-                    <div className="ui-shell__name">{title}</div>
-                    <div className="ui-shell__desc">{description}</div>
+                <span className="ui-shell__icon">{icon}</span>
+                <div className="ui-shell__title-fields">
+                    {onTitleChange ? (
+                        <EditableField
+                            value={title}
+                            placeholder="Без названия"
+                            onSave={onTitleChange}
+                            className="ui-shell__name"
+                        />
+                    ) : (
+                        <div className="ui-shell__name">{title}</div>
+                    )}
+                    {onDescriptionChange && (
+                        <EditableField
+                            value={description ?? ""}
+                            placeholder="Добавить описание…"
+                            onSave={onDescriptionChange}
+                            className="ui-shell__desc"
+                        />
+                    )}
+                    {!onDescriptionChange && description && (
+                        <div className="ui-shell__desc">{description}</div>
+                    )}
                 </div>
             </div>
             {rightTabs && <div className="ui-shell__tabs">{rightTabs}</div>}

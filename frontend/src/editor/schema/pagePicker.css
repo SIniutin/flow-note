@@ -1,0 +1,159 @@
+/* ── PagePicker — command-palette поповер ─────────────────────────────────── */
+
+.page-picker {
+    position: fixed;
+    z-index: 1100;
+    width: 340px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+
+    /* Появление */
+    animation: pp-in 140ms var(--ease) both;
+}
+
+@keyframes pp-in {
+    from {
+        opacity: 0;
+        transform: translateY(-6px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* ── Поиск ───────────────────────────────────────────────────────────────── */
+
+.page-picker__search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.page-picker__search-icon {
+    font-size: 13px;
+    flex-shrink: 0;
+    opacity: 0.5;
+}
+
+.page-picker__input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    font-size: var(--fs-sm);
+    color: var(--text-primary);
+}
+
+.page-picker__input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.page-picker__clear {
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    font-size: 11px;
+    padding: 2px 4px;
+    border-radius: var(--radius-xs);
+    line-height: 1;
+    flex-shrink: 0;
+    transition: color var(--dur-fast) var(--ease),
+                background var(--dur-fast) var(--ease);
+}
+
+.page-picker__clear:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface-muted);
+}
+
+/* ── Список ──────────────────────────────────────────────────────────────── */
+
+.page-picker__list {
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.page-picker__list::-webkit-scrollbar {
+    width: 4px;
+}
+.page-picker__list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.page-picker__list::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 2px;
+}
+
+.page-picker__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
+    user-select: none;
+}
+
+.page-picker__item.is-active {
+    background: var(--accent-soft);
+}
+
+.page-picker__item-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+}
+
+.page-picker__item-title {
+    flex: 1;
+    min-width: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.page-picker__item-hint {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: var(--fw-medium);
+    flex-shrink: 0;
+    opacity: 0.8;
+}
+
+.page-picker__empty {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: var(--fs-sm);
+}
+
+/* ── Футер-подсказка ─────────────────────────────────────────────────────── */
+
+.page-picker__footer {
+    display: flex;
+    gap: 12px;
+    padding: 6px 12px;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-surface-muted);
+    font-size: 11px;
+    color: var(--text-tertiary);
+}

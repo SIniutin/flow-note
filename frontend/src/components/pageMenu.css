@@ -1,0 +1,263 @@
+/* ─── PageMenu — 3-точечное меню страницы ──────────────────────────────────── */
+
+.page-menu {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* ── Trigger button ──────────────────────────────────────────────────────────── */
+
+.page-menu__trigger {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 3px 4px;
+    border-radius: var(--radius-xs);
+    color: rgba(255,255,255,0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.1s, background 0.1s;
+    line-height: 1;
+}
+
+.page-menu__trigger:hover,
+.page-menu__trigger.is-open {
+    color: rgba(255,255,255,0.8);
+    background: rgba(255,255,255,0.08);
+}
+
+/* ── Dropdown ─────────────────────────────────────────────────────────────────── */
+
+.page-menu__drop {
+    z-index: 500;
+    min-width: 164px;
+    background: #1c1c28;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-md, 8px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    padding: 4px;
+    animation: pm-in 120ms var(--ease, ease) both;
+}
+
+@keyframes pm-in {
+    from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+    to   { opacity: 1; transform: none; }
+}
+
+.page-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 9px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: var(--radius-xs, 4px);
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    text-align: left;
+    transition: background 0.1s, color 0.1s;
+}
+
+.page-menu__item:hover:not(:disabled) {
+    background: rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.95);
+}
+
+.page-menu__item--danger {
+    color: rgba(255,107,107,0.7);
+}
+
+.page-menu__item--danger:hover:not(:disabled) {
+    background: rgba(255,107,107,0.1);
+    color: #ff6b6b;
+}
+
+.page-menu__item:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.page-menu__divider {
+    height: 1px;
+    background: rgba(255,255,255,0.07);
+    margin: 3px 4px;
+}
+
+/* ── Permissions modal content ────────────────────────────────────────────────── */
+
+.perm-modal__error {
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(255,107,107,0.1);
+    border: 1px solid rgba(255,107,107,0.2);
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--fs-sm);
+    color: var(--color-error, #e06060);
+}
+
+/* Add user row */
+
+.perm-modal__add {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.perm-modal__input {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg-surface-muted, rgba(255,255,255,0.05));
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-primary);
+    font-size: var(--fs-sm);
+    padding: 6px 10px;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.perm-modal__input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.perm-modal__input:focus {
+    border-color: var(--accent, rgba(124,92,255,0.8));
+    background: var(--accent-soft, rgba(124,92,255,0.06));
+}
+
+.perm-modal__select {
+    background: var(--bg-surface-muted, rgba(255,255,255,0.05));
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--text-secondary);
+    font-size: var(--fs-sm);
+    padding: 6px 8px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.perm-modal__select:focus {
+    border-color: var(--accent, rgba(124,92,255,0.8));
+}
+
+.perm-modal__invite-btn {
+    background: var(--accent-soft, rgba(124,92,255,0.12));
+    border: 1px solid var(--accent-muted, rgba(124,92,255,0.3));
+    border-radius: var(--radius-sm, 6px);
+    color: var(--accent, #a084ff);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium, 500);
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.perm-modal__invite-btn:hover:not(:disabled) {
+    background: rgba(124,92,255,0.22);
+    border-color: rgba(124,92,255,0.55);
+    color: #c4b5ff;
+}
+
+.perm-modal__invite-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+/* Participants list */
+
+.perm-modal__list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 260px;
+    overflow-y: auto;
+    margin: 0 calc(var(--space-5, 20px) * -1);
+    padding: 0 var(--space-5, 20px);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+}
+
+.perm-modal__list::-webkit-scrollbar { width: 4px; }
+.perm-modal__list::-webkit-scrollbar-track { background: transparent; }
+.perm-modal__list::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 2px;
+}
+
+.perm-modal__hint {
+    padding: 12px 0;
+    text-align: center;
+    font-size: var(--fs-sm);
+    color: var(--text-tertiary);
+}
+
+.perm-modal__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.perm-modal__row:last-child {
+    border-bottom: none;
+}
+
+.perm-modal__avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c5cff 0%, #a084ff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: var(--fw-semibold, 600);
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.perm-modal__user {
+    flex: 1;
+    min-width: 0;
+}
+
+.perm-modal__uid {
+    font-size: var(--fs-sm);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.perm-modal__select--inline {
+    font-size: var(--fs-xs);
+    padding: 3px 6px;
+    flex-shrink: 0;
+}
+
+.perm-modal__revoke {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    padding: 4px;
+    border-radius: var(--radius-xs, 4px);
+    display: flex;
+    align-items: center;
+    transition: color 0.1s, background 0.1s;
+    flex-shrink: 0;
+}
+
+.perm-modal__revoke:hover {
+    color: var(--color-error, #e06060);
+    background: rgba(224,96,96,0.1);
+}

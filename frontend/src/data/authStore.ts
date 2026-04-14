@@ -7,6 +7,27 @@ const LS_ACCESS  = "auth:access_token";
 const LS_REFRESH = "auth:refresh_token";
 const LS_USER    = "auth:user";
 
+// ── Dev bypass ────────────────────────────────────────────────────────────────
+// VITE_DEV_BYPASS_AUTH=true в .env.local → автоматически подставляет
+// фейковый JWT с sub=dev-user и exp=2286г., чтобы пройти AuthGate без бэка.
+// Collab WebSocket всё равно упадёт с jwt expired — это нормально.
+
+const DEV_FAKE_JWT =
+    // header: {"alg":"HS256","typ":"JWT"}
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" +
+    // payload: {"sub":"00000000-0000-0000-0000-000000000001","exp":9999999999,"iat":1700000000}
+    ".eyJzdWIiOiIwMDAwMDAwMC0wMDAwLTAwMDAtMDAwMC0wMDAwMDAwMDAwMDEiLCJleHAiOjk5OTk5OTk5OTksImlhdCI6MTcwMDAwMDAwMH0" +
+    ".devonly";
+
+const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === "true";
+
+if (DEV_BYPASS) {
+    // Всегда перезаписываем — иначе старый протухший токен остаётся и
+    // scheduleTokenRefresh сразу делает refresh → получает 401 → wipe().
+    localStorage.setItem(LS_ACCESS,  DEV_FAKE_JWT);
+    localStorage.setItem(LS_REFRESH, DEV_FAKE_JWT);
+}
+
 // ── in-memory state ───────────────────────────────────────────────────────────
 
 let _accessToken:  string | null = localStorage.getItem(LS_ACCESS);
@@ -74,6 +95,7 @@ async function performRefresh(): Promise<void> {
 }
 
 export function scheduleTokenRefresh(): void {
+    if (DEV_BYPASS) return; // фейковый токен не рефрешим — бэка нет
     clearRefreshTimer();
     if (!_accessToken || !_refreshToken) return;
 

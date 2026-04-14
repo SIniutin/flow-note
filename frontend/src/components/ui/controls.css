@@ -1,5 +1,6 @@
 /* Button */
 .ui-btn {
+    position: relative; /* stacking context: кнопка рисуется поверх box-shadow соседних инпутов */
     display: inline-flex;
     align-items: center;
     justify-content: center;

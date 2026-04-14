@@ -10,9 +10,13 @@ const LEGACY_THREADS_KEY = "editor:threads:v1";
 export function loadDoc(pageId?: string): string | null {
     try {
         if (pageId) {
+            // Если pageId задан — берём только per-page ключ.
+            // Legacy-ключ не используем: он от другой страницы и показал бы
+            // чужой контент всем новым страницам.
             const paged = localStorage.getItem(KEY_DOC(pageId));
-            if (paged && paged.trim()) return paged;
+            return paged && paged.trim() ? paged : null;
         }
+        // pageId не задан (старый однострановый режим) — берём legacy
         const legacy = localStorage.getItem(LEGACY_DOC_KEY);
         return legacy && legacy.trim() ? legacy : null;
     } catch { return null; }

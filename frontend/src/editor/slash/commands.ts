@@ -58,8 +58,13 @@ export const slashCommands: SlashCommand[] = [
         icon: "📄",
         keywords: ["page", "link", "страница", "ссылка", "wiki"],
         run: (editor, range) => {
+            // Захватываем позицию курсора ДО удаления текста slash-команды
+            const coords = editor.view.coordsAtPos(range.from);
+            const lineH  = coords.bottom - coords.top;
+            const anchorRect = new DOMRect(coords.left, coords.top, 0, lineH);
+
             editor.chain().focus().deleteRange(range).run();
-            openPagePicker().then(page => {
+            openPagePicker(anchorRect).then(page => {
                 if (!page) return;
                 editor.chain().focus().insertPageLink({
                     page_id: page.id,

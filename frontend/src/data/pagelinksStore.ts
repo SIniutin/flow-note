@@ -83,6 +83,7 @@ export const pagelinksStore = {
 export function useIncomingLinks(pageId: string): PageBacklink[] {
     const [list, setList] = useState<PageBacklink[]>(() => pagelinksStore.incoming(pageId));
     useEffect(() => {
+        setList(pagelinksStore.incoming(pageId));
         return pagelinksStore.subscribe(() => setList(pagelinksStore.incoming(pageId)));
     }, [pageId]);
     return list;
@@ -91,6 +92,7 @@ export function useIncomingLinks(pageId: string): PageBacklink[] {
 export function useOutgoingLinks(pageId: string): PageBacklink[] {
     const [list, setList] = useState<PageBacklink[]>(() => pagelinksStore.outgoing(pageId));
     useEffect(() => {
+        setList(pagelinksStore.outgoing(pageId));
         return pagelinksStore.subscribe(() => setList(pagelinksStore.outgoing(pageId)));
     }, [pageId]);
     return list;

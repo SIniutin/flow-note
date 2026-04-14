@@ -11,11 +11,13 @@ export function useEditorInstance(currentUser: EditorUser, pageId?: string) {
     // createEditorExtensions читает ydoc / awareness через live binding —
     // при смене страницы (connectCollab + key={pageId}) получает свежий ydoc.
     const extensions = useMemo(
-        () => createEditorExtensions(currentUser),
+        () => createEditorExtensions(currentUser, pageId),
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [currentUser.id, pageId],   // пересоздаём при смене страницы
     );
 
+    // Передаём [pageId] в useEditor — TipTap уничтожает и пересоздаёт редактор
+    // при смене страницы, подхватывая новый ydoc из connectCollab().
     return useEditor({
         extensions,
         content: "",
@@ -32,7 +34,7 @@ export function useEditorInstance(currentUser: EditorUser, pageId?: string) {
                 }
             }, 300);
         },
-    });
+    }, [pageId]);
 }
 
 // Yjs import для проверки fragment.length

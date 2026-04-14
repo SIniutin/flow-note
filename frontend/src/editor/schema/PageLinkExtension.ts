@@ -22,8 +22,12 @@ declare module "@tiptap/core" {
     }
 }
 
-export const PageLinkExtension = Node.create({
+export const PageLinkExtension = Node.create<{ pageId: string }>({
     name: "pageLink",
+
+    addOptions() {
+        return { pageId: "" };
+    },
     group: "inline",
     inline: true,
     atom: true,
@@ -80,6 +84,10 @@ export const PageLinkExtension = Node.create({
     },
 
     addProseMirrorPlugins() {
+        // Захватываем pageId в момент создания расширения — он стабилен на весь
+        // жизненный цикл этого инстанса редактора (при смене страницы редактор пересоздаётся).
+        const pageId = this.options.pageId;
+
         const syncLinks = (doc: import("@tiptap/pm/model").Node) => {
             const pageIds: string[] = [];
             doc.descendants(node => {
@@ -87,12 +95,10 @@ export const PageLinkExtension = Node.create({
                     pageIds.push(node.attrs.page_id as string);
                 }
             });
-            Promise.resolve().then(() => {
-                const current = pagesStore.getCurrent();
-                if (current) {
-                    pagelinksStore.syncPage(current.id, current.title, pageIds);
-                }
-            });
+            const page = pagesStore.get(pageId);
+            if (page) {
+                pagelinksStore.syncPage(page.id, page.title, pageIds);
+            }
         };
 
         return [

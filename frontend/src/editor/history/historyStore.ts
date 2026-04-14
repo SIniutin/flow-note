@@ -17,12 +17,14 @@ const MAX_SNAPSHOTS    = 20;
 const SNAPSHOT_INTERVAL_MS = 5 * 60_000; // каждые 5 мин
 
 export interface SnapshotEntry {
-    id:        string;   // uuid
-    pageId:    string;
-    label:     string;   // "Автосохранение 14:35" / "Версия перед удалением"
-    createdAt: string;   // ISO
+    id:          string;   // uuid
+    pageId:      string;
+    label:       string;   // "Автосохранение 14:35" / "Версия перед удалением"
+    createdAt:   string;   // ISO
     /** base64-encoded Y.encodeStateAsUpdate() */
-    stateB64:  string;
+    stateB64:    string;
+    /** HTML-содержимое редактора в момент снапшота — используется при restore */
+    contentHtml?: string;
 }
 
 const LS_KEY = (pageId: string) => `wiki:history:${pageId}:v1`;
@@ -61,14 +63,15 @@ function notifyPage(pageId: string) {
 
 export const historyStore = {
     /** Создать снапшот вручную */
-    createSnapshot(pageId: string, ydoc: Y.Doc, label?: string): SnapshotEntry {
+    createSnapshot(pageId: string, ydoc: Y.Doc, label?: string, html?: string): SnapshotEntry {
         const state = encodeStateAsUpdate(ydoc);
         const snap: SnapshotEntry = {
-            id:        `snap_${Date.now().toString(36)}`,
+            id:          `snap_${Date.now().toString(36)}`,
             pageId,
-            label:     label ?? `Автосохранение ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`,
-            createdAt: new Date().toISOString(),
-            stateB64:  uint8ToBase64(state),
+            label:       label ?? `Автосохранение ${new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`,
+            createdAt:   new Date().toISOString(),
+            stateB64:    uint8ToBase64(state),
+            contentHtml: html,
         };
         const snaps = [snap, ...loadSnapshots(pageId)].slice(0, MAX_SNAPSHOTS);
         saveSnapshots(pageId, snaps);
@@ -81,19 +84,16 @@ export const historyStore = {
         return loadSnapshots(pageId);
     },
 
-    /** Восстановить Y.Doc из снапшота (применяем update поверх текущего состояния) */
-    restore(pageId: string, snapId: string, ydoc: Y.Doc): boolean {
+    /**
+     * Восстановить содержимое из снапшота.
+     * Возвращает сохранённый HTML, который компонент должен передать в
+     * editor.commands.setContent(html, true) — это энкодирует изменения
+     * обратно в ydoc через Collaboration-extension (правильный CRDT-путь).
+     */
+    restore(pageId: string, snapId: string): string | null {
         const snap = loadSnapshots(pageId).find(s => s.id === snapId);
-        if (!snap) return false;
-        const state = base64ToUint8(snap.stateB64);
-        // Сбрасываем документ и применяем снапшот
-        // Создаём временный doc, применяем, берём diff
-        const tmpDoc = new Y.Doc();
-        applyUpdate(tmpDoc, state);
-        const update = encodeStateAsUpdate(tmpDoc, encodeStateVector(ydoc));
-        applyUpdate(ydoc, update);
-        tmpDoc.destroy();
-        return true;
+        if (!snap?.contentHtml) return null;
+        return snap.contentHtml;
     },
 
     /** Удалить снапшот */

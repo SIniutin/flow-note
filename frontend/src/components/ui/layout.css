@@ -102,6 +102,16 @@
     display: flex;
     gap: var(--space-2);
     align-items: flex-start;
+    min-width: 0;
+    flex: 1;
+}
+
+.ui-shell__title-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    flex: 1;
 }
 
 .ui-shell__icon {
@@ -110,16 +120,81 @@
     line-height: 1.4;
 }
 
-.ui-shell__name {
+/* ── Editable name ─────────────────────────────────────────────────────────── */
+
+.ui-shell__name--view {
     font-size: var(--fs-lg);
     font-weight: var(--fw-semibold);
     color: var(--text-primary);
+    cursor: text;
+    border-radius: var(--radius-xs);
+    padding: 1px 4px;
+    margin: -1px -4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.12s;
 }
 
-.ui-shell__desc {
+.ui-shell__name--view:hover {
+    background: var(--bg-surface-muted);
+}
+
+.ui-shell__name--placeholder {
+    color: var(--text-tertiary);
+    font-weight: var(--fw-normal);
+}
+
+.ui-shell__name--editing {
+    font-size: var(--fs-lg);
+    font-weight: var(--fw-semibold);
+    color: var(--text-primary);
+    background: var(--bg-surface-muted);
+    border: 1px solid var(--accent, rgba(124,92,255,0.6));
+    border-radius: var(--radius-xs);
+    outline: none;
+    padding: 0 4px;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+/* ── Editable description ──────────────────────────────────────────────────── */
+
+.ui-shell__desc--view {
     font-size: var(--fs-xs);
     color: var(--text-tertiary);
-    margin-top: 2px;
+    cursor: text;
+    border-radius: var(--radius-xs);
+    padding: 1px 4px;
+    margin: -1px -4px;
+    line-height: 1.5;
+    transition: background 0.12s;
+}
+
+.ui-shell__desc--view:hover {
+    background: var(--bg-surface-muted);
+}
+
+.ui-shell__desc--placeholder {
+    color: var(--text-tertiary);
+    opacity: 0.5;
+    font-style: italic;
+}
+
+.ui-shell__desc--editing {
+    font-size: var(--fs-xs);
+    color: var(--text-primary);
+    background: var(--bg-surface-muted);
+    border: 1px solid var(--accent, rgba(124,92,255,0.6));
+    border-radius: var(--radius-xs);
+    outline: none;
+    padding: 2px 4px;
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+    line-height: 1.5;
+    resize: none;
 }
 
 .ui-shell__tabs {

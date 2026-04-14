@@ -22,6 +22,7 @@ import {TablePickerModal} from "./editor/mwsTable/TablePickerModal";
 import {PresenceAvatars} from "./editor/collab/PresenceAvatars";
 import {EmojiPickerPopover} from "./editor/emoji/EmojiPickerPopover";
 import {Sidebar} from "./components/Sidebar";
+import {BacklinksPanel} from "./components/BacklinksPanel";
 import {pagesStore, useCurrentPage} from "./data/pagesStore";
 import {pageUsersStore} from "./data/pageUsersStore";
 import * as collabProvider from "./editor/collab/collabProvider";
@@ -92,8 +93,8 @@ export default function App() {
         threads, visibleThreads, activeThreadId, setActiveThreadId, setOrphanedIds, removeThread,
     } = useComments();
 
-    const saveStatus = useSaveStatus(editor);
-    const incomingLinks = useIncomingLinks(pageId);
+    const saveStatus = useSaveStatus(editor, pageId);
+    const incomingLinksCount = useIncomingLinks(pageId).length;
 
     // ── Клики по comment-маркам ───────────────────────────────────────────────
     useEffect(() => {
@@ -177,11 +178,17 @@ export default function App() {
     }, [editor]);
 
     const handleImageApply = useCallback(
-        (base64: string, mimeType: string, fileName: string) => {
+        (src: string, mimeType: string, fileName: string, mediaId?: string) => {
             if (!editor) return;
             editor.chain().focus().insertEmbedMedia({
-                kind: "image", src: base64, mime_type: mimeType,
-                file_name: fileName, alt: fileName,
+                kind:     "image",
+                // Если есть media_id — не храним base64 в Yjs-документе.
+                // EmbedMediaNodeView запросит presigned download URL по media_id.
+                src:      mediaId ? null : (src || null),
+                media_id: mediaId ?? null,
+                mime_type: mimeType,
+                file_name: fileName,
+                alt:      fileName,
             }).run();
         }, [editor],
     );
@@ -223,8 +230,8 @@ export default function App() {
         if (!currentPage) return;
         const label = prompt("Название версии:", `Версия ${new Date().toLocaleDateString("ru-RU")}`);
         if (label === null) return;
-        historyStore.createSnapshot(pageId, collabProvider.ydoc, label || undefined);
-    }, [pageId, currentPage]);
+        historyStore.createSnapshot(pageId, collabProvider.ydoc, label || undefined, editor?.getHTML());
+    }, [pageId, currentPage, editor]);
 
     // ── Toolbar / tabs / panels ───────────────────────────────────────────────
     const toolbar = (
@@ -248,7 +255,7 @@ export default function App() {
             </a>
             <a style={{cursor:"pointer", color: rightPanel==="backlinks" ? "var(--accent)" : undefined}}
                onClick={() => setRightPanel(p => p === "backlinks" ? null : "backlinks")}>
-                🔗 Ссылки {incomingLinks.length > 0 && `(${incomingLinks.length})`}
+                🔗 Ссылки {incomingLinksCount > 0 && `(${incomingLinksCount})`}
             </a>
             <a style={{cursor:"pointer", color: rightPanel==="history" ? "var(--accent)" : undefined}}
                onClick={() => setRightPanel(p => p === "history" ? null : "history")}>
@@ -288,51 +295,20 @@ export default function App() {
         );
     } else if (rightPanel === "backlinks") {
         sidePanel = (
-            <SidePanel open onClose={() => setRightPanel(null)}
-                       title="Обратные ссылки"
-                       subtitle={`Страниц ссылается: ${incomingLinks.length}`}>
-                {incomingLinks.length === 0 ? (
-                    <div style={{color:"var(--text-tertiary)",fontSize:"var(--fs-sm)",padding:"var(--space-3) 0"}}>
-                        Ни одна страница не ссылается на эту.
-                        Используйте /страница в редакторе для вставки ссылок.
-                    </div>
-                ) : (
-                    <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        {incomingLinks.map(link => (
-                            <div key={link.id}
-                                 onClick={() => handleNavigate(link.fromId)}
-                                 style={{
-                                     padding:"10px 12px",
-                                     background:"var(--bg-surface)",
-                                     borderRadius:"var(--radius-sm)",
-                                     cursor:"pointer",
-                                     border:"1px solid var(--border-default)",
-                                     transition:"border-color 0.12s",
-                                 }}
-                                 onMouseEnter={e=>(e.currentTarget.style.borderColor="var(--accent)")}
-                                 onMouseLeave={e=>(e.currentTarget.style.borderColor="var(--border-default)")}
-                            >
-                                <div style={{fontWeight:500,fontSize:"var(--fs-sm)",color:"var(--text-primary)"}}>
-                                    📄 {link.fromTitle}
-                                </div>
-                                <div style={{fontSize:"var(--fs-xs)",color:"var(--text-tertiary)",marginTop:2}}>
-                                    {new Date(link.createdAt).toLocaleDateString("ru-RU")}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </SidePanel>
+            <BacklinksPanel
+                pageId={pageId}
+                onNavigate={handleNavigate}
+                onClose={() => setRightPanel(null)}
+            />
         );
     } else if (rightPanel === "history") {
         sidePanel = (
-            <SidePanel open onClose={() => setRightPanel(null)} title="" subtitle="">
-                <VersionHistory
-                    pageId={pageId}
-                    onCreateSnapshot={handleCreateSnapshot}
-                    onClose={() => setRightPanel(null)}
-                />
-            </SidePanel>
+            <VersionHistory
+                pageId={pageId}
+                editor={editor}
+                onCreateSnapshot={handleCreateSnapshot}
+                onClose={() => setRightPanel(null)}
+            />
         );
     }
 
@@ -349,8 +325,17 @@ export default function App() {
 
                 {/* Editor area */}
                 <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-                    <PageShell toolbar={toolbar} rightTabs={tabs} sidePanel={sidePanel}
-                               footer={<EditorFooter editor={editor} saveStatus={saveStatus}/>}>
+                    <PageShell
+                        toolbar={toolbar}
+                        rightTabs={tabs}
+                        sidePanel={sidePanel}
+                        footer={<EditorFooter editor={editor} saveStatus={saveStatus}/>}
+                        title={currentPage?.title}
+                        description={currentPage?.description}
+                        icon={currentPage?.icon}
+                        onTitleChange={title => currentPage && pagesStore.updateTitle(currentPage.id, title)}
+                        onDescriptionChange={desc => currentPage && pagesStore.updateDescription(currentPage.id, desc)}
+                    >
                         {loading
                             ? <PageSkeleton/>
                             : <EditorContent key={pageId} editor={editor}/>
@@ -359,8 +344,8 @@ export default function App() {
                 </div>
             </div>
 
-            <ImageModal open={imgOpen} onClose={handleImageModalClose} onApply={handleImageApply}/>
-            <ImageModal open={stickerOpen} onClose={handleStickerModalClose} onApply={handleImageApply} title="Вставить стикер"/>
+            <ImageModal open={imgOpen} onClose={handleImageModalClose} onApply={handleImageApply} pageId={pageId}/>
+            <ImageModal open={stickerOpen} onClose={handleStickerModalClose} onApply={handleImageApply} pageId={pageId} title="Вставить стикер"/>
             <EmojiPickerPopover/>
             <SlashMenu/>
             <MentionMenu/>

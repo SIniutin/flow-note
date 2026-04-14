@@ -81,7 +81,7 @@ const KeyboardShortcuts = Extension.create({
     },
 });
 
-export function createEditorExtensions(currentUser: EditorUser) {
+export function createEditorExtensions(currentUser: EditorUser, pageId = "") {
     // awareness берём из live binding — актуально после connectCollab()
     collabProvider.awareness?.setLocalStateField("user", {
         name:  currentUser.name,
@@ -105,7 +105,7 @@ export function createEditorExtensions(currentUser: EditorUser) {
         // ── Schema extensions ─────────────────────────────────────────────
         BlockIdExtension,
         EmbedMediaExtension,
-        PageLinkExtension,
+        PageLinkExtension.configure({ pageId }),
         MediaInlineExtension,
         TableOfContentsExtension,
 

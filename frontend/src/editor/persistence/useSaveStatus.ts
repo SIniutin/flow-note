@@ -17,7 +17,7 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
 const DEBOUNCE_MS  = 500;   // ждём паузу в печати
 const SAVED_TTL_MS = 2500;  // «Сохранено» показываем 2.5с, потом idle
 
-export function useSaveStatus(editor: Editor | null): SaveStatus {
+export function useSaveStatus(editor: Editor | null, pageId?: string): SaveStatus {
     const [status, setStatus] = useState<SaveStatus>("idle");
 
     const debounceRef  = useRef<number | null>(null);
@@ -38,7 +38,7 @@ export function useSaveStatus(editor: Editor | null): SaveStatus {
 
             debounceRef.current = window.setTimeout(() => {
                 try {
-                    saveDoc(editor.getHTML());
+                    saveDoc(editor.getHTML(), pageId);
                     setStatus("saved");
                     savedTtlRef.current = window.setTimeout(
                         () => setStatus("idle"),
@@ -56,7 +56,7 @@ export function useSaveStatus(editor: Editor | null): SaveStatus {
             editor.off("update", onUpdate);
             clearTimers();
         };
-    }, [editor, clearTimers]);
+    }, [editor, pageId, clearTimers]);
 
     return status;
 }

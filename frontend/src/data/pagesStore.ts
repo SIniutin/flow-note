@@ -6,11 +6,12 @@ import { useEffect, useState } from "react";
 import { pageClient } from "../api/pageClient";
 
 export interface WikiPage {
-    id:        string;
-    title:     string;
-    icon?:     string;
-    createdAt: string;
-    updatedAt: string;
+    id:          string;
+    title:       string;
+    icon?:       string;
+    description?: string;
+    createdAt:   string;
+    updatedAt:   string;
 }
 
 // ── localStorage keys ─────────────────────────────────────────────────────────
@@ -90,6 +91,14 @@ export const pagesStore = {
         setPages(_pages.map(p =>
             p.id === id
                 ? { ...p, title: title.trim() || "Без названия", updatedAt: new Date().toISOString() }
+                : p
+        ));
+    },
+
+    updateDescription(id: string, description: string): void {
+        setPages(_pages.map(p =>
+            p.id === id
+                ? { ...p, description: description.trim() || undefined, updatedAt: new Date().toISOString() }
                 : p
         ));
     },

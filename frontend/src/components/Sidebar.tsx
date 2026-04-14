@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { usePages, pagesStore, type WikiPage } from "../data/pagesStore";
 import { useAuth } from "../data/authStore";
+import { PageMenu } from "./PageMenu";
 import "./sidebar.css";
 
 // ── SVG icons ─────────────────────────────────────────────────────────────────
@@ -12,24 +13,6 @@ function IconSearch() {
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
             <circle cx="6.5" cy="6.5" r="4.5"/>
             <line x1="10.5" y1="10.5" x2="14" y2="14"/>
-        </svg>
-    );
-}
-
-function IconPencil() {
-    return (
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11.5 2.5a1.5 1.5 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
-        </svg>
-    );
-}
-
-function IconTrash() {
-    return (
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3,5 13,5"/>
-            <path d="M5 5V3h6v2"/>
-            <path d="M4 5l1 9h6l1-9"/>
         </svg>
     );
 }
@@ -109,25 +92,9 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
         }
     }
 
-    function handleDelete(id: string, e: React.MouseEvent) {
-        e.stopPropagation();
-        if (pages.length <= 1) return;
-        if (!confirm("Удалить страницу?")) return;
-        const nextId = pages.find(p => p.id !== id)?.id;
-        pagesStore.delete(id);
-        if (nextId) onNavigate(nextId);
-    }
-
-    if (collapsed) {
-        return (
-            <button className="sidebar__collapsed-btn" onClick={onToggle} title="Открыть панель">
-                <IconChevronRight/>
-            </button>
-        );
-    }
-
     return (
-        <aside className="sidebar">
+        <>
+        <aside className={`sidebar${collapsed ? " sidebar--collapsed" : ""}`}>
             {/* Header */}
             <div className="sidebar__header">
                 <div className="sidebar__workspace-icon">F</div>
@@ -188,20 +155,17 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
                         )}
 
                         <div className="sidebar__item-actions">
-                            <button
-                                title="Переименовать"
-                                onClick={e => { e.stopPropagation(); handleRename(page); }}
-                            >
-                                <IconPencil/>
-                            </button>
-                            <button
-                                className="danger"
-                                title="Удалить"
-                                onClick={e => handleDelete(page.id, e)}
-                                disabled={pages.length <= 1}
-                            >
-                                <IconTrash/>
-                            </button>
+                            <PageMenu
+                                pageId={page.id}
+                                canDelete={pages.length > 1}
+                                onRename={() => handleRename(page)}
+                                onDelete={() => {
+                                    if (!confirm("Удалить страницу?")) return;
+                                    const nextId = pages.find(p => p.id !== page.id)?.id;
+                                    pagesStore.delete(page.id);
+                                    if (nextId) onNavigate(nextId);
+                                }}
+                            />
                         </div>
                     </div>
                 ))}
@@ -219,5 +183,15 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
                 )}
             </div>
         </aside>
+
+        {/* Кнопка открытия — появляется когда sidebar скрыт */}
+        <button
+            className={`sidebar__open-btn${collapsed ? " sidebar__open-btn--visible" : ""}`}
+            onClick={onToggle}
+            title="Открыть панель"
+        >
+            <IconChevronRight/>
+        </button>
+        </>
     );
 }
