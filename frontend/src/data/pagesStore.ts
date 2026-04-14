@@ -58,8 +58,16 @@ function saveLocalCache(pages: WikiPage[]): void {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-// До первой синхронизации показываем кэшированные страницы (хороший UX).
-let _pages: WikiPage[] = buildFromYMap().length > 0 ? buildFromYMap() : loadLocalCache();
+// Если Y.Map пуст (бэкенд ещё не подключён) — сразу засеиваем из localStorage.
+// Это позволяет CRUD работать оффлайн; при синхронизации Yjs CRDT сделает merge.
+if (yPages.size === 0) {
+    const local = loadLocalCache();
+    workspaceDoc.transact(() => {
+        local.forEach(p => yPages.set(p.id, JSON.stringify(p)));
+    });
+}
+
+let _pages: WikiPage[] = buildFromYMap();
 let _currentId: string = localStorage.getItem(LS_CURRENT) ?? _pages[0]?.id ?? "page-default";
 
 const listeners = new Set<() => void>();
@@ -76,12 +84,11 @@ function ensureCurrentIdValid(): void {
 
 yPages.observe(() => {
     const fresh = buildFromYMap();
-    if (fresh.length > 0) {
-        _pages = fresh;
-        saveLocalCache(_pages);
-        ensureCurrentIdValid();
-        notify();
-    }
+    // Не обнуляем страницы если Y.Map стал пустым (защита от race condition)
+    _pages = fresh.length > 0 ? fresh : _pages;
+    saveLocalCache(_pages);
+    ensureCurrentIdValid();
+    notify();
 });
 
 // ── Public API ────────────────────────────────────────────────────────────────

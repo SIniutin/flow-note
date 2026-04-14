@@ -26,8 +26,57 @@ function wipe() {
     _accessToken  = null;
     _refreshToken = null;
     _user         = null;
+    clearRefreshTimer();
     localStorage.removeItem(LS_ACCESS);
     localStorage.removeItem(LS_REFRESH);
+}
+
+// ── Auto token refresh ────────────────────────────────────────────────────────
+
+let _refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function parseExpiry(token: string): number | null {
+    try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        return typeof payload.exp === "number" ? payload.exp * 1000 : null; // → ms
+    } catch { return null; }
+}
+
+function clearRefreshTimer() {
+    if (_refreshTimer !== null) { clearTimeout(_refreshTimer); _refreshTimer = null; }
+}
+
+async function performRefresh(): Promise<void> {
+    if (!_refreshToken) { wipe(); notify(); return; }
+    try {
+        const tokens = await authClient.refresh(_refreshToken);
+        persist(tokens);
+        notify();
+        scheduleTokenRefresh();
+        // Сообщаем провайдерам что нужно переподключиться с новым токеном
+        window.dispatchEvent(new CustomEvent("auth:token-refreshed"));
+    } catch {
+        // refresh_token протух — разлогиниваем
+        wipe();
+        notify();
+    }
+}
+
+export function scheduleTokenRefresh(): void {
+    clearRefreshTimer();
+    if (!_accessToken || !_refreshToken) return;
+
+    const exp = parseExpiry(_accessToken);
+    if (!exp) return;
+
+    // Обновляем за 60 секунд до истечения
+    const delay = exp - Date.now() - 60_000;
+    if (delay <= 0) {
+        // Токен уже истёк или скоро истечёт — обновляем немедленно
+        void performRefresh();
+        return;
+    }
+    _refreshTimer = setTimeout(() => void performRefresh(), delay);
 }
 
 // ── public actions ────────────────────────────────────────────────────────────
@@ -50,6 +99,7 @@ export async function login(
     const res = await authClient.login(identifier, password);
     _user = res.user;
     persist(res.tokens);
+    scheduleTokenRefresh();
     notify();
     return res;
 }
@@ -58,6 +108,7 @@ export async function register(email: string, login: string, password: string) {
     const res = await authClient.register(email, login, password);
     _user = res.user;
     persist(res.tokens);
+    scheduleTokenRefresh();
     notify();
     return res;
 }
@@ -71,6 +122,9 @@ export async function logout() {
 }
 
 export function isAuthenticated(): boolean { return !!_accessToken; }
+
+// Запускаем таймер сразу при загрузке, если токен уже есть в localStorage
+scheduleTokenRefresh();
 
 // ── hook ──────────────────────────────────────────────────────────────────────
 

@@ -49,8 +49,18 @@ export function connectCollab(pageId: string): void {
     provider.destroy();
     ydoc.destroy();
 
-    ydoc     = new Y.Doc();
-    provider = makeProvider(pageId, ydoc);
+    ydoc      = new Y.Doc();
+    provider  = makeProvider(pageId, ydoc);
+    awareness = provider.awareness;
+}
+
+/**
+ * Пересоздаёт только WebSocket-провайдер, не трогая ydoc.
+ * Используется после обновления JWT-токена — редактор ремонтировать не нужно.
+ */
+export function reconnectPageProvider(pageId: string): void {
+    provider.destroy();
+    provider  = makeProvider(pageId, ydoc);
     awareness = provider.awareness;
 }
 
