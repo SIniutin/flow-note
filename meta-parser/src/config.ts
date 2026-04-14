@@ -25,4 +25,5 @@ export const config = {
 
   // ── pages-service gRPC ────────────────────────────────────────────────────
   pagesGrpcAddr: str("PAGES_GRPC_ADDR", "localhost:50051"),
+  pagesAuthToken: str("PAGES_AUTH_TOKEN", ""),
 } as const;

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
+	collabpb "github.com/flow-note/api-contracts/generated/proto/collab/v1"
 	"github.com/flow-note/api-gateway/internal/handlers"
 	"github.com/flow-note/api-gateway/internal/middleware"
 	"github.com/flow-note/common/authsecurity"
@@ -57,6 +58,10 @@ func (a *App) Run(ctx context.Context) error {
 		logger.Error("failed to setup auth service handler", zap.Error(err))
 		return err
 	}
+	if err := collabpb.RegisterCollabTableServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.CollabGRPCAddr, dialOpts); err != nil {
+		logger.Error("failed to setup collab table service handler", zap.Error(err))
+		return err
+	}
 
 	// ── Protected mux (requires valid JWT) ───────────────────────────────────
 	mux := http.NewServeMux()
@@ -76,11 +81,11 @@ func (a *App) Run(ctx context.Context) error {
 
 	// ── Collab proxy (/collab/*) — JWT validation is done inside collab-service
 	// via onAuthenticate; the proxy is intentionally unauthenticated at this layer.
-	collabProxy := handlers.NewCollabProxy(a.cfg.CollabAddr)
+	collabProxy := handlers.NewCollabProxy(a.cfg.CollabAddr, logger)
 
 	// ── Root dispatcher: collab bypasses JWT middleware, everything else goes through it
 	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/collab/") {
+		if r.URL.Path == "/collab" || strings.HasPrefix(r.URL.Path, "/collab/") {
 			collabProxy.ServeHTTP(w, r)
 			return
 		}
@@ -89,13 +94,16 @@ func (a *App) Run(ctx context.Context) error {
 
 	var handler http.Handler = root
 	handler = middleware.Cors(a.cfg.AllowedOrigin)(handler)
+	handler = middleware.RequestLog(logger)(handler)
 	handler = cr.RecoveryMiddleware(logger)(handler)
 
 	logger.Info(
 		"api-gateway listening",
 		zap.String("http_addr", a.cfg.HTTPAddr),
 		zap.String("auth_addr", a.cfg.AuthGRPCAddr),
+		zap.String("collab_grpc_addr", a.cfg.CollabGRPCAddr),
 		zap.String("collab_addr", a.cfg.CollabAddr),
+		zap.String("allowed_origin", a.cfg.AllowedOrigin),
 	)
 
 	return cr.ServeHTTP(ctx, a.cfg.HTTPAddr, handler)

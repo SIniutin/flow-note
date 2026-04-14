@@ -17,6 +17,7 @@ import (
 	"time"
 
 	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
+	collabpb "github.com/flow-note/api-contracts/generated/proto/collab/v1"
 	sec "github.com/flow-note/common/authsecurity"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -24,6 +25,10 @@ import (
 
 type fakeAuthServer struct {
 	authpb.UnimplementedAuthServiceServer
+}
+
+type fakeCollabTableServer struct {
+	collabpb.UnimplementedCollabTableServiceServer
 }
 
 func (s *fakeAuthServer) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.AuthResponse, error) {
@@ -54,8 +59,24 @@ func (s *fakeAuthServer) Logout(ctx context.Context, req *authpb.LogoutRequest) 
 	return &emptypb.Empty{}, nil
 }
 
+func (s *fakeCollabTableServer) GetTable(ctx context.Context, req *collabpb.GetTableRequest) (*collabpb.GetTableResponse, error) {
+	return &collabpb.GetTableResponse{DstId: req.GetDstId()}, nil
+}
+
+func (s *fakeCollabTableServer) ListTableViews(ctx context.Context, req *collabpb.ListTableViewsRequest) (*collabpb.ListTableViewsResponse, error) {
+	return &collabpb.ListTableViewsResponse{DstId: req.GetDstId()}, nil
+}
+
+func (s *fakeCollabTableServer) GetTableView(ctx context.Context, req *collabpb.GetTableViewRequest) (*collabpb.GetTableViewResponse, error) {
+	return &collabpb.GetTableViewResponse{
+		DstId:  req.GetDstId(),
+		ViewId: req.GetViewId(),
+	}, nil
+}
+
 func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 	authAddr := startAuthTestGRPCServer(t)
+	collabAddr := startCollabTestGRPCServer(t)
 	keyPath, _ := createGatewayTestKeyPair(t)
 	httpAddr := freeTCPAddr(t)
 
@@ -65,6 +86,7 @@ func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 	a := New(Config{
 		HTTPAddr:      httpAddr,
 		AuthGRPCAddr:  authAddr,
+		CollabGRPCAddr: collabAddr,
 		CollabAddr:    "127.0.0.1:4000",
 		PublicKeyPath: keyPath,
 		JWTIssuer:     "todo-auth",
@@ -127,6 +149,20 @@ func startAuthTestGRPCServer(t *testing.T) string {
 	}
 	srv := grpc.NewServer()
 	authpb.RegisterAuthServiceServer(srv, &fakeAuthServer{})
+	go func() { _ = srv.Serve(lis) }()
+	t.Cleanup(srv.Stop)
+	return lis.Addr().String()
+}
+
+func startCollabTestGRPCServer(t *testing.T) string {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		skipIfListenForbidden(t, err)
+		t.Fatalf("listen collab grpc: %v", err)
+	}
+	srv := grpc.NewServer()
+	collabpb.RegisterCollabTableServiceServer(srv, &fakeCollabTableServer{})
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(srv.Stop)
 	return lis.Addr().String()

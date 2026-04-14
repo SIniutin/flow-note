@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package pages.v1;
+
+import "google/protobuf/empty.proto";
+
+service PagesService {
+  rpc ReplacePageLinks(ReplacePageLinksRequest) returns (google.protobuf.Empty);
+  rpc ReplacePageMentions(ReplacePageMentionsRequest) returns (google.protobuf.Empty);
+  rpc ReplacePageTables(ReplacePageTablesRequest) returns (google.protobuf.Empty);
+  rpc ReplacePageMedia(ReplacePageMediaRequest) returns (google.protobuf.Empty);
+}
+
+enum MediaType {
+  MEDIA_TYPE_UNSPECIFIED = 0;
+  MEDIA_TYPE_IMAGE = 1;
+  MEDIA_TYPE_VIDEO = 2;
+  MEDIA_TYPE_FILE = 3;
+  MEDIA_TYPE_AUDIO = 4;
+}
+
+message PageLinkInput {
+  string to_page_id = 1;
+  string block_id = 2;
+}
+
+message ReplacePageLinksRequest {
+  string page_id = 1;
+  repeated PageLinkInput links = 2;
+}
+
+message PageMentionInput {
+  string user_id = 1;
+  string block_id = 2;
+}
+
+message ReplacePageMentionsRequest {
+  string page_id = 1;
+  repeated PageMentionInput mentions = 2;
+}
+
+message PageTableInput {
+  string dst_id = 1;
+  string block_id = 2;
+}
+
+message ReplacePageTablesRequest {
+  string page_id = 1;
+  repeated PageTableInput tables = 2;
+}
+
+message PageMediaInput {
+  MediaType type = 1;
+  string block_id = 2;
+}
+
+message ReplacePageMediaRequest {
+  string page_id = 1;
+  repeated PageMediaInput media = 2;
+}

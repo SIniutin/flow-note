@@ -7,23 +7,29 @@ import { CellsMap, CellValue, getRecords } from "./mwsClient";
 import { config } from "../config";
 
 interface TableEntry {
+  dstId: string;
+  viewId: string;
   cells: CellsMap;
   idleTimer: ReturnType<typeof setTimeout>;
 }
 
-// dst_id → TableEntry
+// dst_id:view_id → TableEntry
 const tables = new Map<string, TableEntry>();
 
-function scheduleEviction(dstId: string): ReturnType<typeof setTimeout> {
+function makeKey(dstId: string, viewId?: string): string {
+  return `${dstId}::${viewId ?? ""}`;
+}
+
+function scheduleEviction(key: string): ReturnType<typeof setTimeout> {
   return setTimeout(() => {
-    tables.delete(dstId);
-    console.log(`[tableRegistry] evicted ${dstId}`);
+    tables.delete(key);
+    console.log(`[tableRegistry] evicted ${key}`);
   }, config.tableIdleMs);
 }
 
 /** Проверяет, загружена ли таблица в кеш (не делает HTTP-запроса). */
-export function hasTable(dstId: string): boolean {
-  return tables.has(dstId);
+export function hasTable(dstId: string, viewId?: string): boolean {
+  return tables.has(makeKey(dstId, viewId));
 }
 
 /**
@@ -33,21 +39,25 @@ export function hasTable(dstId: string): boolean {
  */
 export async function loadTable(
   dstId: string,
-  token: string
+  token: string,
+  viewId?: string
 ): Promise<CellsMap> {
-  const existing = tables.get(dstId);
+  const key = makeKey(dstId, viewId);
+  const existing = tables.get(key);
   if (existing) {
     clearTimeout(existing.idleTimer);
-    existing.idleTimer = scheduleEviction(dstId);
+    existing.idleTimer = scheduleEviction(key);
     return existing.cells;
   }
 
-  const cells = await getRecords(dstId, token);
-  tables.set(dstId, {
+  const cells = await getRecords(dstId, token, viewId);
+  tables.set(key, {
+    dstId,
+    viewId: viewId ?? "",
     cells,
-    idleTimer: scheduleEviction(dstId),
+    idleTimer: scheduleEviction(key),
   });
-  console.log(`[tableRegistry] loaded ${dstId}, ${cells.size} records`);
+  console.log(`[tableRegistry] loaded ${dstId}${viewId ? ` view=${viewId}` : ""}, ${cells.size} records`);
   return cells;
 }
 
@@ -61,15 +71,15 @@ export function updateCell(
   fieldId: string,
   value: CellValue
 ): void {
-  const entry = tables.get(dstId);
-  if (!entry) return;
-
-  const row = entry.cells.get(recordId) ?? {};
-  row[fieldId] = value;
-  entry.cells.set(recordId, row);
-
-  clearTimeout(entry.idleTimer);
-  entry.idleTimer = scheduleEviction(dstId);
+  for (const [key, entry] of tables.entries()) {
+    if (entry.dstId !== dstId) continue;
+    const row = entry.cells.get(recordId);
+    if (!row) continue;
+    row[fieldId] = value;
+    entry.cells.set(recordId, row);
+    clearTimeout(entry.idleTimer);
+    entry.idleTimer = scheduleEviction(key);
+  }
 }
 
 /**
@@ -80,7 +90,12 @@ export function getCellValue(
   recordId: string,
   fieldId: string
 ): CellValue | undefined {
-  return tables.get(dstId)?.cells.get(recordId)?.[fieldId];
+  for (const entry of tables.values()) {
+    if (entry.dstId !== dstId) continue;
+    const value = entry.cells.get(recordId)?.[fieldId];
+    if (value !== undefined) return value;
+  }
+  return undefined;
 }
 
 /**
@@ -93,10 +108,11 @@ export function rollbackCell(
   fieldId: string,
   previousValue: CellValue
 ): void {
-  const entry = tables.get(dstId);
-  if (!entry) return;
-
-  const row = entry.cells.get(recordId) ?? {};
-  row[fieldId] = previousValue;
-  entry.cells.set(recordId, row);
+  for (const entry of tables.values()) {
+    if (entry.dstId !== dstId) continue;
+    const row = entry.cells.get(recordId);
+    if (!row) continue;
+    row[fieldId] = previousValue;
+    entry.cells.set(recordId, row);
+  }
 }

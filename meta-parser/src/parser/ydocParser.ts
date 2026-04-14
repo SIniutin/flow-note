@@ -10,10 +10,15 @@
 import * as Y from "yjs";
 
 export interface PageMetadata {
-  title:        string;         // первый heading или первый paragraph (plain text)
-  contentText:  string;         // весь plain text (для полнотекстового поиска)
-  wordCount:    number;
-  mwsTableIds:  string[];       // все dst_id mws_table-блоков
+  title:       string;         // первый heading или первый paragraph (plain text)
+  contentText: string;         // весь plain text (для полнотекстового поиска)
+  wordCount:   number;
+  tables:      PageTableRef[];
+}
+
+export interface PageTableRef {
+  dstId: string;
+  blockId: string;
 }
 
 export function parseSnapshot(blob: Uint8Array): PageMetadata {
@@ -37,7 +42,7 @@ export function parseSnapshot(blob: Uint8Array): PageMetadata {
     title:       resolvedTitle,
     contentText: collector.fullText.trim(),
     wordCount:   words.length,
-    mwsTableIds: [...collector.tableIds],
+    tables:      [...collector.tables.values()],
   };
 }
 
@@ -46,7 +51,7 @@ export function parseSnapshot(blob: Uint8Array): PageMetadata {
 class TextCollector {
   firstBlockText = "";   // fallback title — первый непустой блок контента
   fullText       = "";
-  tableIds       = new Set<string>();
+  tables         = new Map<string, PageTableRef>();
 
   private firstBlockSet = false;
 
@@ -58,8 +63,8 @@ class TextCollector {
     }
   }
 
-  addTableId(dstId: string): void {
-    this.tableIds.add(dstId);
+  addTable(dstId: string, blockId: string): void {
+    this.tables.set(`${dstId}::${blockId}`, { dstId, blockId });
   }
 }
 
@@ -78,8 +83,12 @@ function walkFragment(node: Y.XmlFragment | Y.XmlElement, col: TextCollector): v
 
     if (name === "mws_table") {
       const dstId = child.getAttribute("dst_id");
-      if (typeof dstId === "string" && dstId.length > 0) {
-        col.addTableId(dstId);
+      const blockId = child.getAttribute("block_id");
+      if (
+        typeof dstId === "string" && dstId.length > 0 &&
+        typeof blockId === "string" && blockId.length > 0
+      ) {
+        col.addTable(dstId, blockId);
       }
       continue; // внутри mws_table текста нет
     }

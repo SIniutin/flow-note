@@ -25,6 +25,22 @@ interface MwsRecordsResponse {
   };
 }
 
+interface MwsViewsResponse {
+  data: {
+    views: Array<{
+      id: string;
+      name: string;
+      type: string;
+    }>;
+  };
+}
+
+export interface TableViewInfo {
+  id: string;
+  name: string;
+  type: string;
+}
+
 /**
  * Загружает ВСЕ записи датасета из MWS с пагинацией.
  * Каждый запрос имеет таймаут MWS_TIMEOUT_MS (AbortSignal.timeout).
@@ -32,13 +48,22 @@ interface MwsRecordsResponse {
  */
 export async function getRecords(
   dstId: string,
-  token: string
+  token: string,
+  viewId?: string
 ): Promise<CellsMap> {
   const map: CellsMap = new Map();
   let pageNum = 1;
 
   while (true) {
-    const url = `${config.mwsApiBase}/datasheets/${dstId}/records?pageNum=${pageNum}&pageSize=${config.mwsPageSize}&fieldKey=id`;
+    const params = new URLSearchParams({
+      pageNum: String(pageNum),
+      pageSize: String(config.mwsPageSize),
+      fieldKey: "id",
+    });
+    if (viewId) {
+      params.set("viewId", viewId);
+    }
+    const url = `${config.mwsApiBase}/datasheets/${dstId}/records?${params.toString()}`;
 
     let res: Response;
     try {
@@ -65,6 +90,29 @@ export async function getRecords(
   }
 
   return map;
+}
+
+export async function getViews(dstId: string, token: string): Promise<TableViewInfo[]> {
+  let res: Response;
+  try {
+    res = await fetch(`${config.mwsApiBase}/datasheets/${dstId}/views`, {
+      signal: AbortSignal.timeout(config.mwsTimeoutMs),
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (err) {
+    throw new MwsUnavailableError(dstId, err);
+  }
+
+  if (!res.ok) {
+    throw new Error(`MWS GET views ${dstId} → HTTP ${res.status}`);
+  }
+
+  const body = (await res.json()) as MwsViewsResponse;
+  return body.data.views.map((view) => ({
+    id: view.id,
+    name: view.name,
+    type: view.type,
+  }));
 }
 
 /**

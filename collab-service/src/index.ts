@@ -18,6 +18,7 @@ import { MwsUnavailableError } from "./mws/mwsClient";
 import { handleTblOp, TblOpMessage } from "./handlers/tblOpHandler";
 import { startRoutingServer } from "./routingServer";
 import { verifyToken } from "./auth/jwtVerifier";
+import { startTableGrpcServer } from "./grpc/tableServer";
 
 import { config } from "./config";
 
@@ -32,6 +33,7 @@ const docObservers = new Map<string, () => void>();
 
 // Флаг graceful shutdown — onAuthenticate отклоняет новые соединения
 let shuttingDown = false;
+let tableGrpcServer: import("@grpc/grpc-js").Server | null = null;
 
 interface ConnContext {
   token: string;
@@ -247,6 +249,19 @@ async function shutdown(signal: string): Promise<void> {
     console.error("[shutdown] kafka disconnect error:", err)
   );
 
+  await new Promise<void>((resolve) => {
+    if (!tableGrpcServer) {
+      resolve();
+      return;
+    }
+    tableGrpcServer.tryShutdown((err) => {
+      if (err) {
+        console.error("[shutdown] grpc shutdown error:", err);
+      }
+      resolve();
+    });
+  });
+
   await server.destroy().catch((err: unknown) =>
     console.error("[shutdown] server.destroy error:", err)
   );
@@ -264,6 +279,7 @@ async function init(): Promise<void> {
   await ensureBucketLifecycle();
   startOutboxPublisher();
   startRoutingServer();
+  tableGrpcServer = await startTableGrpcServer();
   await server.listen();
   console.log(`[collab] hocuspocus listening on :${config.port}`);
 }

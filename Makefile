@@ -2,7 +2,7 @@ SECRETS_DIR := secrets
 PRIVATE_KEY  := $(SECRETS_DIR)/jwt_private_key.pem
 PUBLIC_KEY   := $(SECRETS_DIR)/jwt_public_key.pem
 
-.PHONY: up down restart logs keys frontend dev
+.PHONY: up down restart logs keys frontend dev auth-clear
 
 ## Generate JWT keys if missing
 keys:
@@ -30,6 +30,10 @@ restart:
 ## Tail logs for all services (or: make logs svc=api-gateway)
 logs:
 	docker compose logs -f $(svc)
+
+## Clear auth tables in PostgreSQL
+auth-clear:
+	docker compose exec -T postgres psql -U postgres -d auth -c "TRUNCATE TABLE users CASCADE;"
 
 ## Install frontend deps
 frontend:

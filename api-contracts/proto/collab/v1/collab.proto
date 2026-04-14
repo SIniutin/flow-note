@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package collab.v1;
+
+option go_package = "github.com/flow-note/api-contracts/generated/proto/collab/v1;collabv1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/struct.proto";
+
+message GetTableRequest {
+  string dst_id = 1;
+}
+
+message ListTableViewsRequest {
+  string dst_id = 1;
+}
+
+message GetTableViewRequest {
+  string dst_id = 1;
+  string view_id = 2;
+}
+
+message TableRow {
+  string record_id = 1;
+  google.protobuf.Struct cells = 2;
+}
+
+message TableView {
+  string view_id = 1;
+  string name = 2;
+  string type = 3;
+}
+
+message GetTableResponse {
+  string dst_id = 1;
+  string view_id = 2;
+  repeated TableRow rows = 3;
+}
+
+message ListTableViewsResponse {
+  string dst_id = 1;
+  repeated TableView views = 2;
+}
+
+message GetTableViewResponse {
+  string dst_id = 1;
+  string view_id = 2;
+  repeated TableRow rows = 3;
+}
+
+//
+service CollabTableService {
+  //
+  rpc GetTable(GetTableRequest) returns (GetTableResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/tables/{dst_id}"
+    };
+  }
+
+  //
+  rpc ListTableViews(ListTableViewsRequest) returns (ListTableViewsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/tables/{dst_id}/views"
+    };
+  }
+
+  //
+  rpc GetTableView(GetTableViewRequest) returns (GetTableViewResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/tables/{dst_id}/views/{view_id}"
+    };
+  }
+}

@@ -8,7 +8,7 @@
  * Гарантии доставки:
  *   - at-least-once: eachMessage делает await processEvent, offset коммитится только после успеха.
  *   - Если инстанс падает во время обработки → сообщение перечитывается после рестарта/rebalance.
- *   - Идемпотентность на стороне pages-service желательна (UpdatePageMeta с тем же s3_key — безвредно).
+ *   - Идемпотентность на стороне pages-service желательна (replace с тем же snapshot — безвреден).
  *
  * Внутренний параллелизм одного инстанса:
  *   - partitionsConsumedConcurrently = WORKER_CONCURRENCY (default 4).
@@ -20,7 +20,7 @@ import { Kafka, Consumer, EachMessagePayload } from "kafkajs";
 import { config }          from "./config";
 import { downloadBlob }    from "./storage/s3Client";
 import { parseSnapshot }   from "./parser/ydocParser";
-import { updatePageMeta }  from "./grpc/pagesClient";
+import { replacePageRelations }  from "./grpc/pagesClient";
 import { sendToDlq }       from "./kafka/dlqProducer";
 
 interface SnapshotUploadedEvent {
@@ -31,7 +31,7 @@ interface SnapshotUploadedEvent {
 }
 
 async function processEvent(event: SnapshotUploadedEvent): Promise<void> {
-  const { page_id, s3_key, ts } = event;
+  const { page_id, s3_key } = event;
 
   console.log(`[worker] processing  page=${page_id}  s3_key=${s3_key}`);
 
@@ -39,10 +39,10 @@ async function processEvent(event: SnapshotUploadedEvent): Promise<void> {
   console.log(`[worker] downloaded  page=${page_id}  bytes=${blob.byteLength}`);
 
   const meta = parseSnapshot(blob);
-  console.log(`[worker] parsed  page=${page_id}  title="${meta.title}"  words=${meta.wordCount}  tables=[${meta.mwsTableIds.join(", ")}]`);
+  console.log(`[worker] parsed  page=${page_id}  title="${meta.title}"  words=${meta.wordCount}  tables=[${meta.tables.map((table) => table.dstId).join(", ")}]`);
 
-  await updatePageMeta(page_id, s3_key, meta, ts);
-  console.log(`[worker] UpdatePageMeta OK  page=${page_id}`);
+  await replacePageRelations(page_id, meta);
+  console.log(`[worker] ReplacePageRelations OK  page=${page_id}`);
 }
 
 const MAX_PROCESS_ATTEMPTS  = 3;

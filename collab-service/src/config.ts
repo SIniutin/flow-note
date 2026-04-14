@@ -17,6 +17,7 @@ function str(name: string, fallback: string): string {
 export const config = {
   // ── Server ────────────────────────────────────────────────────────────────
   port: int("PORT", 4000),
+  grpcPort: int("COLLAB_GRPC_PORT", 50053),
   /** Таймаут hocuspocus на бездействие коннекта, мс */
   wsTimeout: int("WS_TIMEOUT_MS", 120_000),
 
