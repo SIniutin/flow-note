@@ -1,4 +1,5 @@
 import {useState, useEffect, useRef, useCallback, useMemo} from "react";
+import * as Y from "yjs";
 import {EditorContent} from "@tiptap/react";
 import {SidePanel} from "./components/ui/surfaces";
 import {PageShell, PageSkeleton} from "./components/ui/layout";
@@ -26,8 +27,9 @@ import {BacklinksPanel} from "./components/BacklinksPanel";
 import {pagesStore, useCurrentPage} from "./data/pagesStore";
 import {pageUsersStore} from "./data/pageUsersStore";
 import * as collabProvider from "./editor/collab/collabProvider";
+import { usePageMeta, setPageMeta } from "./editor/collab/collabProvider";
 import {VersionHistory} from "./editor/history/VersionHistory";
-import {historyStore} from "./editor/history/historyStore";
+import {VersionPreviewOverlay} from "./editor/history/VersionPreviewOverlay";
 import {useIncomingLinks} from "./data/pagelinksStore";
 import {PagePickerModal} from "./editor/schema/PagePickerModal";
 import "./components/sidebar.css";
@@ -39,6 +41,8 @@ export default function App() {
     const [rightPanel, setRightPanel] = useState<"comments" | "history" | "backlinks" | null>("comments");
     const [composerOpen, setComposerOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [previewDoc, setPreviewDoc] = useState<Y.Doc | null>(null);
+    const [previewLabel, setPreviewLabel] = useState("");
 
     // ── Страница ──────────────────────────────────────────────────────────────
     const currentPage = useCurrentPage();
@@ -95,6 +99,22 @@ export default function App() {
 
     const saveStatus = useSaveStatus(editor, pageId);
     const incomingLinksCount = useIncomingLinks(pageId).length;
+
+    // Живой заголовок и описание из ydoc — обновляются у всех участников в реальном времени.
+    // Fallback на данные из REST (pagesStore) пока ydoc ещё не синхронизировался.
+    const pageMeta = usePageMeta(pageId);
+    const liveTitle       = pageMeta.title       ?? currentPage?.title;
+    const liveDescription = pageMeta.description ?? currentPage?.description;
+
+    // При первом синке ydoc из S3-снапшота (и при изменениях от других клиентов)
+    // пробрасываем актуальные метаданные в pagesStore → сайдбар показывает свежий title.
+    useEffect(() => {
+        if (pageMeta.title !== null) pagesStore.updateTitle(pageId, pageMeta.title);
+    }, [pageMeta.title, pageId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (pageMeta.description !== null) pagesStore.updateDescription(pageId, pageMeta.description);
+    }, [pageMeta.description, pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Клики по comment-маркам ───────────────────────────────────────────────
     useEffect(() => {
@@ -225,13 +245,6 @@ export default function App() {
         setRightPanel("comments");
     }, []);
 
-    // ── Snapshot ──────────────────────────────────────────────────────────────
-    const handleCreateSnapshot = useCallback(() => {
-        if (!currentPage) return;
-        const label = prompt("Название версии:", `Версия ${new Date().toLocaleDateString("ru-RU")}`);
-        if (label === null) return;
-        historyStore.createSnapshot(pageId, collabProvider.ydoc, label || undefined, editor?.getHTML());
-    }, [pageId, currentPage, editor]);
 
     // ── Toolbar / tabs / panels ───────────────────────────────────────────────
     const toolbar = (
@@ -305,9 +318,8 @@ export default function App() {
         sidePanel = (
             <VersionHistory
                 pageId={pageId}
-                editor={editor}
-                onCreateSnapshot={handleCreateSnapshot}
                 onClose={() => setRightPanel(null)}
+                onPreview={(doc, label) => { setPreviewDoc(doc); setPreviewLabel(label); }}
             />
         );
     }
@@ -330,11 +342,19 @@ export default function App() {
                         rightTabs={tabs}
                         sidePanel={sidePanel}
                         footer={<EditorFooter editor={editor} saveStatus={saveStatus}/>}
-                        title={currentPage?.title}
-                        description={currentPage?.description}
+                        title={liveTitle}
+                        description={liveDescription}
                         icon={currentPage?.icon}
-                        onTitleChange={title => currentPage && pagesStore.updateTitle(currentPage.id, title)}
-                        onDescriptionChange={desc => currentPage && pagesStore.updateDescription(currentPage.id, desc)}
+                        onTitleChange={title => {
+                            if (!currentPage) return;
+                            setPageMeta("title", title);
+                            pagesStore.updateTitle(currentPage.id, title);
+                        }}
+                        onDescriptionChange={desc => {
+                            if (!currentPage) return;
+                            setPageMeta("description", desc);
+                            pagesStore.updateDescription(currentPage.id, desc);
+                        }}
                     >
                         {loading
                             ? <PageSkeleton/>
@@ -352,6 +372,13 @@ export default function App() {
             <TablePickerModal/>
             <PagePickerModal/>
             <CommentComposer editor={editor} open={composerOpen} onClose={() => setComposerOpen(false)}/>
+            {previewDoc && (
+                <VersionPreviewOverlay
+                    doc={previewDoc}
+                    label={previewLabel}
+                    onClose={() => setPreviewDoc(null)}
+                />
+            )}
         </ToolbarRefContext.Provider>
     );
 }

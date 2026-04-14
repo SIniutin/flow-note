@@ -1,15 +1,20 @@
 // ─── src/editor/history/VersionHistory.tsx ────────────────────────────────────
 
-import { useState } from "react";
-import type { Editor } from "@tiptap/react";
-import { useHistory, historyStore, type SnapshotEntry } from "./historyStore";
+import { useEffect, useState } from "react";
+import * as Y from "yjs";
+// Yjs 13 экспортирует applyUpdate в runtime, но TypeScript typings отстают.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const yApplyUpdate: (doc: Y.Doc, update: Uint8Array) => void = (Y as any).applyUpdate;
+type YDoc = Y.Doc;
+import { pageClient, type BackendVersion } from "../../api/pageClient";
+import { mediaClient } from "../../api/mediaClient";
+import { getAccessToken } from "../../data/authStore";
 import "./versionHistory.css";
 
 interface VersionHistoryProps {
-    pageId:           string;
-    editor:           Editor | null;
-    onCreateSnapshot: () => void;
-    onClose:          () => void;
+    pageId:    string;
+    onClose:   () => void;
+    onPreview: (doc: YDoc, label: string) => void;
 }
 
 function IconClock() {
@@ -20,20 +25,11 @@ function IconClock() {
         </svg>
     );
 }
-function IconRestore() {
+function IconEye() {
     return (
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M2 8a6 6 0 1 0 1.5-4"/>
-            <polyline points="2,4 2,8 6,8"/>
-        </svg>
-    );
-}
-function IconTrash() {
-    return (
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3,5 13,5"/>
-            <path d="M5 5V3h6v2"/>
-            <path d="M4 5l1 9h6l1-9"/>
+            <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z"/>
+            <circle cx="8" cy="8" r="2"/>
         </svg>
     );
 }
@@ -45,54 +41,64 @@ function IconClose() {
         </svg>
     );
 }
-function IconPlus() {
-    return (
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="8" y1="3" x2="8" y2="13"/>
-            <line x1="3" y1="8" x2="13" y2="8"/>
-        </svg>
-    );
+
+/** Парсим timestamp из S3-ключа: "snapshots/{pageId}/{timestamp}.bin" */
+function keyToDate(s3Key: string): Date {
+    const part = s3Key.split("/").pop()?.replace(".bin", "") ?? "";
+    const ts = parseInt(part, 10);
+    return isNaN(ts) ? new Date(0) : new Date(ts);
 }
 
-export function VersionHistory({ pageId, editor, onCreateSnapshot, onClose }: VersionHistoryProps) {
-    const snapshots = useHistory(pageId);
-    const [restoring, setRestoring] = useState<string | null>(null);
-    const [restoreError, setRestoreError] = useState<string | null>(null);
+function formatDate(d: Date): string {
+    const today = new Date();
+    const isToday = d.toDateString() === today.toDateString();
+    return isToday
+        ? d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+        : d.toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
 
-    function handleRestore(snap: SnapshotEntry) {
-        if (!confirm(`Восстановить версию «${snap.label}»?\nТекущие изменения будут перезаписаны.`)) return;
-        setRestoring(snap.id);
-        setRestoreError(null);
+function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+export function VersionHistory({ pageId, onClose, onPreview }: VersionHistoryProps) {
+    const [versions, setVersions]   = useState<BackendVersion[]>([]);
+    const [loading, setLoading]     = useState(true);
+    const [loadingId, setLoadingId] = useState<number | null>(null);
+    const [error, setError]         = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!getAccessToken()) { setLoading(false); return; }
+        setLoading(true);
+        setError(null);
+        pageClient.listVersions(pageId)
+            .then(({ versions: v }) => setVersions(v ?? []))
+            .catch(() => setError("Не удалось загрузить историю версий"))
+            .finally(() => setLoading(false));
+    }, [pageId]);
+
+    async function handlePreview(v: BackendVersion) {
+        setLoadingId(v.id);
+        setError(null);
         try {
-            if (!snap.contentHtml) {
-                setRestoreError(`Снапшот «${snap.label}» создан без HTML-содержимого и не может быть восстановлен.`);
-                return;
-            }
-            if (!editor) {
-                setRestoreError("Редактор не готов.");
-                return;
-            }
-            // setContent → ProseMirror transaction → Collaboration extension
-            // кодирует изменение обратно в ydoc → Hocuspocus синхронизирует.
-            editor.commands.setContent(snap.contentHtml, { emitUpdate: true });
+            // v.date — полный S3-ключ вида "snapshots/{pageId}/{timestamp}.bin".
+            // media-service строит путь как snapshots/{pageId}/{versionId},
+            // поэтому передаём только имя файла.
+            const filename = v.date.split("/").pop() ?? v.date;
+            const presignedUrl = await mediaClient.getSnapshotUrl(v.pageId, filename);
+            const res = await fetch(presignedUrl);
+            if (!res.ok) throw new Error(`fetch snapshot: ${res.status}`);
+            const bytes = new Uint8Array(await res.arrayBuffer());
+            const doc = new Y.Doc();
+            yApplyUpdate(doc, bytes);
+            const date = keyToDate(v.date);
+            onPreview(doc, `Версия #${v.id} · ${formatDate(date)}`);
+        } catch {
+            setError("Не удалось загрузить версию");
         } finally {
-            setRestoring(null);
+            setLoadingId(null);
         }
-    }
-
-    function handleDelete(snap: SnapshotEntry, e: React.MouseEvent) {
-        e.stopPropagation();
-        if (!confirm(`Удалить версию «${snap.label}»?`)) return;
-        historyStore.delete(pageId, snap.id);
-    }
-
-    function formatDate(iso: string) {
-        const d = new Date(iso);
-        const today = new Date();
-        const isToday = d.toDateString() === today.toDateString();
-        return isToday
-            ? d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
-            : d.toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
     }
 
     return (
@@ -102,64 +108,64 @@ export function VersionHistory({ pageId, editor, onCreateSnapshot, onClose }: Ve
                 <div className="vh__head-top">
                     <div className="vh__head-left">
                         <span className="vh__title">История версий</span>
-                        {snapshots.length > 0 && <span className="vh__count">{snapshots.length}</span>}
+                        {versions.length > 0 && <span className="vh__count">{versions.length}</span>}
                     </div>
                     <button className="vh__close-btn" onClick={onClose} title="Закрыть">
                         <IconClose/>
                     </button>
                 </div>
-                <button className="vh__save-btn" onClick={onCreateSnapshot}>
-                    <IconPlus/> Сохранить текущую версию
-                </button>
+                <p className="vh__subtitle">
+                    Автосохранение каждые несколько минут. Нажмите 👁 чтобы просмотреть версию.
+                </p>
             </div>
 
             {/* Error */}
-            {restoreError && (
-                <div className="vh__error" onClick={() => setRestoreError(null)}>
-                    {restoreError}
+            {error && (
+                <div className="vh__error" onClick={() => setError(null)}>
+                    {error}
                 </div>
             )}
 
             {/* List */}
             <div className="vh__list">
-                {snapshots.length === 0 ? (
+                {loading ? (
+                    <div className="vh__empty">
+                        <IconClock/>
+                        <span>Загрузка…</span>
+                    </div>
+                ) : versions.length === 0 ? (
                     <div className="vh__empty">
                         <IconClock/>
                         <span>Нет сохранённых версий.</span>
-                        <span>Нажмите «Сохранить версию» чтобы создать снапшот.</span>
+                        <span>Версии создаются автоматически при редактировании.</span>
                     </div>
                 ) : (
-                    snapshots.map(snap => (
-                        <div key={snap.id} className="vh__item">
-                            <div className="vh__item-icon">
-                                <IconClock/>
+                    // Новые версии сверху
+                    [...versions].reverse().map(v => {
+                        const date = keyToDate(v.date);
+                        const isLoading = loadingId === v.id;
+                        return (
+                            <div key={v.id} className="vh__item">
+                                <div className="vh__item-icon"><IconClock/></div>
+                                <div className="vh__item-body">
+                                    <div className="vh__item-label">Версия #{v.id}</div>
+                                    <div className="vh__item-date">
+                                        {formatDate(date)} · {formatSize(v.size)}
+                                    </div>
+                                </div>
+                                <div className="vh__item-actions">
+                                    <button
+                                        className="vh__action-btn vh__action-btn--view"
+                                        onClick={() => { void handlePreview(v); }}
+                                        disabled={isLoading || loadingId !== null}
+                                        title="Просмотреть эту версию (только чтение)"
+                                    >
+                                        {isLoading ? "…" : <><IconEye/> Смотреть</>}
+                                    </button>
+                                </div>
                             </div>
-                            <div className="vh__item-body">
-                                <div className="vh__item-label">{snap.label}</div>
-                                <div className="vh__item-date">{formatDate(snap.createdAt)}</div>
-                                {!snap.contentHtml && (
-                                    <div className="vh__item-warn">Без HTML — восстановление недоступно</div>
-                                )}
-                            </div>
-                            <div className="vh__item-actions">
-                                <button
-                                    className="vh__action-btn vh__action-btn--restore"
-                                    onClick={() => handleRestore(snap)}
-                                    disabled={restoring === snap.id || !snap.contentHtml}
-                                    title="Восстановить эту версию"
-                                >
-                                    {restoring === snap.id ? "…" : <><IconRestore/> Восст.</>}
-                                </button>
-                                <button
-                                    className="vh__action-btn vh__action-btn--delete"
-                                    onClick={e => handleDelete(snap, e)}
-                                    title="Удалить снапшот"
-                                >
-                                    <IconTrash/>
-                                </button>
-                            </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>

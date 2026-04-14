@@ -1,0 +1,136 @@
+/* ─── Version Preview Overlay ─────────────────────────────────────────────── */
+
+.vpo__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 32px 24px;
+    overflow: auto;
+    animation: vpo-fade 0.15s ease;
+}
+
+@keyframes vpo-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.vpo__panel {
+    position: relative;
+    width: 100%;
+    max-width: 780px;
+    min-height: 200px;
+    max-height: calc(100vh - 64px);
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: vpo-slide 0.18s var(--ease);
+}
+
+@keyframes vpo-slide {
+    from { transform: translateY(-12px); opacity: 0; }
+    to   { transform: translateY(0);     opacity: 1; }
+}
+
+/* Header */
+.vpo__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    background: var(--bg-surface-muted);
+}
+
+.vpo__head-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.vpo__badge {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-muted, rgba(124,92,255,0.3));
+    border-radius: 4px;
+    padding: 2px 7px;
+    white-space: nowrap;
+}
+
+.vpo__label {
+    font-size: var(--fs-sm);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vpo__close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    border-radius: var(--radius-xs);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: color 0.1s, background 0.1s;
+}
+
+.vpo__close:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface-muted);
+}
+
+/* Body / scroll area */
+.vpo__body {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-default) transparent;
+    padding: 32px 48px 48px;
+}
+
+.vpo__body::-webkit-scrollbar { width: 6px; }
+.vpo__body::-webkit-scrollbar-track { background: transparent; }
+.vpo__body::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 3px;
+}
+
+.vpo__editor {
+    max-width: 680px;
+    margin: 0 auto;
+}
+
+/* Make the editor look like the main page (no focus ring, etc.) */
+.vpo__editor .ProseMirror {
+    outline: none;
+    caret-color: transparent;
+    user-select: text;
+}
+
+.vpo__loading {
+    padding: 48px;
+    text-align: center;
+    color: var(--text-tertiary);
+    font-size: var(--fs-sm);
+}
