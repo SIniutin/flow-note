@@ -23,10 +23,9 @@ import {PresenceAvatars} from "./editor/collab/PresenceAvatars";
 import {EmojiPickerPopover} from "./editor/emoji/EmojiPickerPopover";
 import {Sidebar} from "./components/Sidebar";
 import {pagesStore, useCurrentPage} from "./data/pagesStore";
-import {connectCollab, initWorkspaceProvider, reconnectPageProvider} from "./editor/collab/collabProvider";
+import * as collabProvider from "./editor/collab/collabProvider";
 import {VersionHistory} from "./editor/history/VersionHistory";
 import {historyStore} from "./editor/history/historyStore";
-import {ydoc} from "./editor/collab/collabProvider";
 import {useIncomingLinks} from "./data/pagelinksStore";
 import {PagePickerModal} from "./editor/schema/PagePickerModal";
 import "./components/sidebar.css";
@@ -43,31 +42,29 @@ export default function App() {
     const currentPage = useCurrentPage();
     const pageId = currentPage?.id ?? "page-default";
 
-    // При первом монтировании: запускаем workspace-провайдер и переподключаем collab
-    // с актуальным JWT-токеном.
+    // Синхронно (до useEditorInstance) переключаем collab-провайдер при смене страницы.
+    // useEffect здесь не подходит — он запускается ПОСЛЕ render, а useEditorInstance
+    // читает ydoc/awareness уже во время render.
+    const prevPageIdRef = useRef<string | null>(null);
+    if (prevPageIdRef.current !== pageId) {
+        prevPageIdRef.current = pageId;
+        collabProvider.connectCollab(pageId);
+    }
+
+    // При первом монтировании: запускаем workspace-провайдер.
     useEffect(() => {
-        connectCollab(pageId);
-        initWorkspaceProvider(() => pagesStore.onWorkspaceSynced());
+        collabProvider.initWorkspaceProvider(() => pagesStore.onWorkspaceSynced());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // После автообновления JWT-токена переподключаем провайдеры без ремонта редактора.
     useEffect(() => {
         const handler = () => {
-            reconnectPageProvider(pageId);
-            initWorkspaceProvider(() => pagesStore.onWorkspaceSynced());
+            collabProvider.reconnectPageProvider(pageId);
+            collabProvider.initWorkspaceProvider(() => pagesStore.onWorkspaceSynced());
         };
         window.addEventListener("auth:token-refreshed", handler);
         return () => window.removeEventListener("auth:token-refreshed", handler);
-    }, [pageId]);
-
-    // При смене страницы переподключаем collab
-    const prevPageIdRef = useRef<string>(pageId);
-    useEffect(() => {
-        if (prevPageIdRef.current !== pageId) {
-            prevPageIdRef.current = pageId;
-            connectCollab(pageId);
-        }
     }, [pageId]);
 
     // ── Toolbar ref ───────────────────────────────────────────────────────────
@@ -221,7 +218,7 @@ export default function App() {
         if (!currentPage) return;
         const label = prompt("Название версии:", `Версия ${new Date().toLocaleDateString("ru-RU")}`);
         if (label === null) return;
-        historyStore.createSnapshot(pageId, ydoc, label || undefined);
+        historyStore.createSnapshot(pageId, collabProvider.ydoc, label || undefined);
     }, [pageId, currentPage]);
 
     // ── Toolbar / tabs / panels ───────────────────────────────────────────────

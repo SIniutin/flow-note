@@ -4,7 +4,7 @@ import {useMemo} from "react";
 import {useEditor} from "@tiptap/react";
 import {createEditorExtensions, initialContent} from "./extensions";
 import {loadDoc} from "./persistence/storage";
-import {ydoc} from "./collab/collabProvider";
+import * as collabProvider from "./collab/collabProvider";
 import type {User} from "../data/users";
 
 export function useEditorInstance(currentUser: User, pageId?: string) {
@@ -24,7 +24,7 @@ export function useEditorInstance(currentUser: User, pageId?: string) {
             // Ждём 300 мс — даём Hocuspocus загрузить документ с сервера.
             setTimeout(() => {
                 if (editor.isDestroyed) return;
-                const fragment = ydoc.getXmlFragment("default");
+                const fragment = collabProvider.ydoc.getXmlFragment("default");
                 if (fragment.length === 0) {
                     // Новый документ: загружаем локальный кэш или начальный контент
                     const saved = loadDoc(pageId) ?? initialContent;

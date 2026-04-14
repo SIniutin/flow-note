@@ -12,6 +12,7 @@
 
 import type { MwsTable, MwsColumn, MwsRow } from "../types/mwsTable";
 import { getAccessToken } from "../data/authStore";
+import { collabClient } from "./collabClient";
 
 // ── Catalog (metadata without rows) ──────────────────────────────────────────
 // Хранит схему колонок и метаданные таблиц. Строки всегда идут из API.
@@ -194,7 +195,7 @@ export const tablesClient = {
         }));
     },
 
-    /** Одна таблица со строками — сначала TTL кэш, потом API, потом seed fallback */
+    /** Одна таблица со строками — TTL кэш → collab-service → MWS → seed fallback */
     async getTable(id: string): Promise<MwsTable | null> {
         const cached = cacheGet(id);
         if (cached) return cached;
@@ -204,10 +205,18 @@ export const tablesClient = {
 
         let rows: MwsRow[];
         try {
-            const records = await fetchRecords(id);
-            rows = records.length > 0
-                ? fusionToRows(records, meta.columns)
-                : (SEED_ROWS[id] ?? []);
+            // collab-service — единый источник для realtime состояния строк.
+            // Если таблица загружена в tableRegistry, возвращаем оттуда.
+            const collabRows = await collabClient.getTableRows(id);
+            if (collabRows !== null && collabRows.length > 0) {
+                rows = collabRows;
+            } else {
+                // Fallback: MWS Fusion API (таблица ещё не загружена в collab-service)
+                const records = await fetchRecords(id);
+                rows = records.length > 0
+                    ? fusionToRows(records, meta.columns)
+                    : (SEED_ROWS[id] ?? []);
+            }
         } catch (e) {
             console.warn(`[tablesClient] API unavailable for ${id}, using seed:`, e);
             rows = SEED_ROWS[id] ?? [];

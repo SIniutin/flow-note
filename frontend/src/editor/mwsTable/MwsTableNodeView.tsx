@@ -98,16 +98,24 @@ export function MwsTableNodeView({ node, selected, updateAttributes }: NodeViewP
             .finally(() => setLoading(false));
     }, [tableId]);
 
-    // ── live-sync: tbl_aw от collab-service ──────────────────────────────────
-    // Hocuspocus stateless: { type: "tbl_aw", dst_id: string }
-    // При получении инвалидируем кэш и перезагружаем таблицу.
+    // ── live-sync: stateless-сообщения от collab-service ─────────────────────
+    // tbl_op      — optimistic update (collab-service уже обновил свой кэш)
+    // tbl_rollback — откат optimistic update
+    // tbl_aw      — acknowledged write (MWS подтвердил запись)
+    //
+    // Во всех случаях инвалидируем TTL-кэш и перечитываем из collab-service
+    // (tablesClient.getTable теперь читает из collab-service первым).
+    // Это устраняет race: UI всегда видит то же состояние, что collab-service.
 
     useEffect(() => {
         if (!tableId) return;
         const handler = ({ payload }: { payload: string }) => {
             try {
                 const msg = JSON.parse(payload) as { type?: string; dst_id?: string };
-                if ((msg.type === "tbl_aw" || msg.type === "tbl_op") && msg.dst_id === tableId) {
+                const relevant =
+                    msg.dst_id === tableId &&
+                    (msg.type === "tbl_op" || msg.type === "tbl_rollback" || msg.type === "tbl_aw");
+                if (relevant) {
                     tablesClient.invalidateCache(tableId);
                     tablesClient.getTable(tableId)
                         .then(t => { if (t) setTable(t); })

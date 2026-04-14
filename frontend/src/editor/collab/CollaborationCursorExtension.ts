@@ -10,7 +10,7 @@
 
 import { Extension } from "@tiptap/core";
 import { yCursorPlugin } from "@tiptap/y-tiptap";
-import { awareness } from "./collabProvider";
+import * as collabProvider from "./collabProvider";
 
 function buildCursor(user: { name?: string; color?: string }): HTMLElement {
     const color = user.color ?? "#888";
@@ -34,7 +34,7 @@ export const CollaborationCursorExtension = Extension.create({
 
     addProseMirrorPlugins() {
         return [
-            yCursorPlugin(awareness, {
+            yCursorPlugin(collabProvider.awareness, {
                 cursorBuilder: buildCursor,
             }),
         ];

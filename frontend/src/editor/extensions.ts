@@ -24,7 +24,7 @@ import "./mention/mentionNode.css";
 import { MentionExtension }  from "./mention/mentionExtension";
 import { MwsTableExtension } from "./mwsTable/MwsTableExtension";
 
-import { ydoc, awareness } from "./collab/collabProvider";
+import * as collabProvider from "./collab/collabProvider";
 import "./collab/collab.css";
 import type { User } from "../data/users";
 
@@ -83,7 +83,7 @@ const KeyboardShortcuts = Extension.create({
 
 export function createEditorExtensions(currentUser: User) {
     // awareness берём из live binding — актуально после connectCollab()
-    awareness.setLocalStateField("user", {
+    collabProvider.awareness.setLocalStateField("user", {
         name:  currentUser.name,
         color: AVATAR_COLORS[currentUser.colorIndex],
     });
@@ -112,7 +112,7 @@ export function createEditorExtensions(currentUser: User) {
         // ── Collaboration (Yjs) ───────────────────────────────────────────
         // ydoc — live binding: connectCollab() обновляет значение,
         // поэтому при перемонтировании редактора используется новый doc.
-        Collaboration.configure({ document: ydoc }),
+        Collaboration.configure({ document: collabProvider.ydoc }),
         CollaborationCursorExtension,
 
         // ── Keyboard shortcuts ────────────────────────────────────────────
