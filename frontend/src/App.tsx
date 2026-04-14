@@ -24,6 +24,7 @@ import {PresenceAvatars} from "./editor/collab/PresenceAvatars";
 import {EmojiPickerPopover} from "./editor/emoji/EmojiPickerPopover";
 import {Sidebar} from "./components/Sidebar";
 import {BacklinksPanel} from "./components/BacklinksPanel";
+import {SharePanel} from "./components/SharePanel";
 import {pagesStore, useCurrentPage} from "./data/pagesStore";
 import {pageUsersStore} from "./data/pageUsersStore";
 import * as collabProvider from "./editor/collab/collabProvider";
@@ -38,7 +39,7 @@ export default function App() {
     const [loading, setLoading] = useState(true);
     const [imgOpen, setImgOpen] = useState(false);
     const [stickerOpen, setStickerOpen] = useState(false);
-    const [rightPanel, setRightPanel] = useState<"comments" | "history" | "backlinks" | null>("comments");
+    const [rightPanel, setRightPanel] = useState<"comments" | "history" | "backlinks" | "share" | null>("comments");
     const [composerOpen, setComposerOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [previewDoc, setPreviewDoc] = useState<Y.Doc | null>(null);
@@ -274,6 +275,10 @@ export default function App() {
                onClick={() => setRightPanel(p => p === "history" ? null : "history")}>
                 🕐 История
             </a>
+            <a style={{cursor:"pointer", color: rightPanel==="share" ? "var(--accent)" : undefined}}
+               onClick={() => setRightPanel(p => p === "share" ? null : "share")}>
+                👥 Доступ
+            </a>
             <a style={{cursor:"pointer", color:"var(--text-tertiary)"}}
                onClick={() => { clearAll(pageId); window.location.reload(); }}>
                 Сбросить
@@ -320,6 +325,13 @@ export default function App() {
                 pageId={pageId}
                 onClose={() => setRightPanel(null)}
                 onPreview={(doc, label) => { setPreviewDoc(doc); setPreviewLabel(label); }}
+            />
+        );
+    } else if (rightPanel === "share") {
+        sidePanel = (
+            <SharePanel
+                pageId={pageId}
+                onClose={() => setRightPanel(null)}
             />
         );
     }

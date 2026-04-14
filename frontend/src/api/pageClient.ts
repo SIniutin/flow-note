@@ -27,6 +27,34 @@ async function authFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     return res.json() as T;
 }
 
+export interface BackendPageLink {
+    id:         string;
+    fromPageId: string;
+    toPageId:   string;
+    blockId:    string;
+}
+
+export interface BackendVersion {
+    id:     number;
+    pageId: string;
+    date:   string;
+    size:   number;
+}
+
+export type PermissionRole =
+    | "PAGE_PERMISSION_ROLE_VIEWER"
+    | "PAGE_PERMISSION_ROLE_COMMENTER"
+    | "PAGE_PERMISSION_ROLE_EDITOR"
+    | "PAGE_PERMISSION_ROLE_MENTOR";
+
+export const ROLE_LABELS: Record<string, string> = {
+    PAGE_PERMISSION_ROLE_VIEWER:    "Просмотр",
+    PAGE_PERMISSION_ROLE_COMMENTER: "Комментирование",
+    PAGE_PERMISSION_ROLE_EDITOR:    "Редактирование",
+    PAGE_PERMISSION_ROLE_MENTOR:    "Управление",
+    PAGE_PERMISSION_ROLE_OWNER:     "Владелец",
+};
+
 export interface PagePermission {
     id:        string;
     pageId:    string;
@@ -50,5 +78,26 @@ export const pageClient = {
 
     listPermissions(pageId: string): Promise<{ permissions: PagePermission[] }> {
         return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/permissions`);
+    },
+
+    grantPermission(pageId: string, userId: string, role: PermissionRole): Promise<{ permission: PagePermission }> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/permissions`, {
+            method: "POST",
+            body: JSON.stringify({ user_id: userId, role }),
+        });
+    },
+
+    revokePermission(pageId: string, userId: string): Promise<void> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/permissions/${encodeURIComponent(userId)}`, {
+            method: "DELETE",
+        });
+    },
+
+    getConnected(pageId: string): Promise<{ pages: BackendPage[]; links: BackendPageLink[] }> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/connected`);
+    },
+
+    listVersions(pageId: string): Promise<{ versions: BackendVersion[] }> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/versions`);
     },
 };
