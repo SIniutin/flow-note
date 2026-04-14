@@ -7,7 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"pages-service/internal/domain"
+	"github.com/flow-note/page-service/internal/domain"
 )
 
 func (s *Service) ReplacePageLinks(ctx context.Context, pageID uuid.UUID, links []domain.PageLinkInput) error {

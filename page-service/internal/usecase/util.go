@@ -1,6 +1,6 @@
 package usecase
 
-import "pages-service/internal/domain"
+import "github.com/flow-note/page-service/internal/domain"
 
 func permissionLevel(role domain.PermissionRole) int {
 	switch role {

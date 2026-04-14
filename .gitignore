@@ -21,3 +21,9 @@ npm-debug.log*
 
 # JWT keys (generated locally, never commit)
 secrets/*.pem
+
+generated/
+
+bin/
+
+docs/

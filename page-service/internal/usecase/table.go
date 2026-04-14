@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"pages-service/internal/domain"
+	"github.com/flow-note/page-service/internal/domain"
 )
 
 func (s *Service) ReplacePageTables(ctx context.Context, pageID uuid.UUID, tables []domain.PageTableInput) error {

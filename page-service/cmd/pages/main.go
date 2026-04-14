@@ -10,8 +10,8 @@ import (
 
 	"go.uber.org/zap"
 
-	appconfig "pages-service/config"
-	"pages-service/internal/app"
+	appconfig "github.com/flow-note/page-service/config"
+	"github.com/flow-note/page-service/internal/app"
 )
 
 func main() {

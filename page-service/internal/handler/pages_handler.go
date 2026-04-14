@@ -9,9 +9,10 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	pagesv1 "pages-service/generated/proto/pages/v1"
-	"pages-service/internal/domain"
-	"pages-service/internal/usecase"
+	pagesv1 "github.com/flow-note/api-contracts/generated/proto/page/v1"
+
+	"github.com/flow-note/page-service/internal/domain"
+	"github.com/flow-note/page-service/internal/usecase"
 )
 
 // TODO: if Role not found - get it

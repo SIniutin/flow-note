@@ -6,7 +6,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"pages-service/internal/domain"
+	"github.com/flow-note/page-service/internal/domain"
 )
 
 func (s *Service) ReplacePageMentions(ctx context.Context, pageID uuid.UUID, mentions []domain.PageMentionInput) error {

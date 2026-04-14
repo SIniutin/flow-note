@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"pages-service/internal/domain"
+	"github.com/flow-note/page-service/internal/domain"
 )
 
 type PageRepository interface {

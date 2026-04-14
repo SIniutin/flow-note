@@ -2,13 +2,14 @@ package handler
 
 import (
 	"context"
-	"pages-service/common/authctx"
 	"time"
+
+	"github.com/flow-note/common/authctx"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"pages-service/internal/domain"
+	"github.com/flow-note/page-service/internal/domain"
 )
 
 func mustParseUUID(raw string) uuid.UUID {

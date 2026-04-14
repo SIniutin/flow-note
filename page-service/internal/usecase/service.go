@@ -2,12 +2,13 @@ package usecase
 
 import (
 	"context"
-	"pages-service/internal/repository"
+
+	"github.com/flow-note/page-service/internal/repository"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"pages-service/internal/domain"
+	"github.com/flow-note/page-service/internal/domain"
 )
 
 var _ PageUsecase = (*Service)(nil)

@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"pages-service/internal/domain"
+	"github.com/flow-note/page-service/internal/domain"
 )
 
 func (s *Service) CreatePage(ctx context.Context, ownerId uuid.UUID, title string) (*domain.Page, error) {

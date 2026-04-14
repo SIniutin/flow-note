@@ -5,22 +5,23 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"pages-service/common/authsecurity"
-	"pages-service/config"
 	"strings"
+
+	"github.com/flow-note/common/authsecurity"
+	"github.com/flow-note/page-service/config"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"pages-service/common/grpcauth"
-	pb "pages-service/generated/proto/pages/v1"
-	"pages-service/internal/handler"
-	"pages-service/internal/repository"
-	"pages-service/internal/usecase"
+	pb "github.com/flow-note/api-contracts/generated/proto/page/v1"
+	"github.com/flow-note/common/grpcauth"
+	"github.com/flow-note/page-service/internal/handler"
+	"github.com/flow-note/page-service/internal/repository"
+	"github.com/flow-note/page-service/internal/usecase"
 
-	"pages-service/db"
+	"github.com/flow-note/page-service/db"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 )

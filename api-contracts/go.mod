@@ -3,6 +3,7 @@ module github.com/flow-note/api-contracts
 go 1.26.1
 
 require (
+	github.com/envoyproxy/protoc-gen-validate v1.3.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260413220744-3e5c5a5a0756
 	google.golang.org/grpc v1.80.0

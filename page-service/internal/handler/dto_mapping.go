@@ -1,8 +1,9 @@
 package handler
 
 import (
-	pagesv1 "pages-service/generated/proto/pages/v1"
-	"pages-service/internal/domain"
+	pagesv1 "github.com/flow-note/api-contracts/generated/proto/page/v1"
+
+	"github.com/flow-note/page-service/internal/domain"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
