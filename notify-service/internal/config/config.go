@@ -7,28 +7,34 @@ import (
 )
 
 type Config struct {
-	ServiceName    string
-	GRPCPort       string
-	PostgresDSN    string
-	BrokerURL      string
-	BrokerExchange string
-	BrokerQueue    string
-	RedisAddr      string
-	LogLevel       string
-	ConsumerWait   time.Duration
+	ServiceName      string
+	GRPCPort         string
+	PostgresDSN      string
+	BrokerURL        string
+	BrokerExchange   string
+	BrokerQueue      string
+	RedisAddr        string
+	LogLevel         string
+	ConsumerWait     time.Duration
+	JWTPublicKeyPEM  string
+	JWTIssuer        string
+	JWTAudience      string
 }
 
 func Load() Config {
 	return Config{
-		ServiceName:    env("NOTIFY_SERVICE_NAME", "notify-service"),
-		GRPCPort:       env("NOTIFY_GRPC_PORT", "9092"),
-		PostgresDSN:    env("NOTIFY_POSTGRES_DSN", "postgres://notify:notify@localhost:5434/notifydb?sslmode=disable"),
-		BrokerURL:      env("BROKER_URL", "amqp://guest:guest@localhost:5672/"),
-		BrokerExchange: env("BROKER_EXCHANGE", "flow.events"),
-		BrokerQueue:    env("NOTIFY_BROKER_QUEUE", "notify-service.events"),
-		RedisAddr:      env("REDIS_ADDR", "localhost:6379"),
-		LogLevel:       env("LOG_LEVEL", "info"),
-		ConsumerWait:   envDuration("NOTIFY_CONSUMER_WAIT", 3*time.Second),
+		ServiceName:     env("NOTIFY_SERVICE_NAME", "notify-service"),
+		GRPCPort:        env("NOTIFY_GRPC_PORT", "9092"),
+		PostgresDSN:     env("NOTIFY_POSTGRES_DSN", "postgres://notify:notify@localhost:5434/notifydb?sslmode=disable"),
+		BrokerURL:       env("BROKER_URL", "amqp://guest:guest@localhost:5672/"),
+		BrokerExchange:  env("BROKER_EXCHANGE", "flow.events"),
+		BrokerQueue:     env("NOTIFY_BROKER_QUEUE", "notify-service.events"),
+		RedisAddr:       env("REDIS_ADDR", "localhost:6379"),
+		LogLevel:        env("LOG_LEVEL", "info"),
+		ConsumerWait:    envDuration("NOTIFY_CONSUMER_WAIT", 3*time.Second),
+		JWTPublicKeyPEM: env("JWT_PUBLIC_KEY_PEM", ""),
+		JWTIssuer:       env("JWT_ISSUER", "flow-note-auth"),
+		JWTAudience:     env("JWT_AUDIENCE", "flow-note-api"),
 	}
 }
 

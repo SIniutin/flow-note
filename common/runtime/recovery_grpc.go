@@ -9,6 +9,32 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// RecoveryStreamServerInterceptor recovers from panics in gRPC stream handlers.
+func RecoveryStreamServerInterceptor(logger *zap.Logger) grpc.StreamServerInterceptor {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+	return func(
+		srv any,
+		ss grpc.ServerStream,
+		info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler,
+	) (err error) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				logger.Error(
+					"grpc stream panic",
+					zap.Any("recover", rec),
+					zap.String("method", info.FullMethod),
+					zap.Stack("stack"),
+				)
+				err = status.Error(codes.Internal, "internal error")
+			}
+		}()
+		return handler(srv, ss)
+	}
+}
+
 // RecoveryUnaryServerInterceptor recovers from panics in gRPC handlers.
 func RecoveryUnaryServerInterceptor(logger *zap.Logger) grpc.UnaryServerInterceptor {
 	if logger == nil {

@@ -10,6 +10,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  CopyObjectCommand,
   PutBucketLifecycleConfigurationCommand,
 } from "@aws-sdk/client-s3";
 import { Readable } from "node:stream";
@@ -28,16 +29,26 @@ const s3 = new S3Client({
 
 /**
  * Загружает blob в S3 и возвращает s3_key.
- * Ключ: snapshots/{pageId}/{Date.now()}.bin
+ * Основной ключ: snapshots/{pageId}/{Date.now()}.bin
+ * Дополнительно обновляет стабильный alias:
+ *   snapshots/{pageId}/latest.bin
  */
 export async function uploadSnapshot(pageId: string, blob: Uint8Array): Promise<string> {
   const key = `snapshots/${pageId}/${Date.now()}.bin`;
+  const latestKey = `snapshots/${pageId}/latest.bin`;
 
   await s3.send(new PutObjectCommand({
     Bucket:      config.s3Bucket,
     Key:         key,
     Body:        Buffer.from(blob),
     ContentType: "application/octet-stream",
+  }));
+
+  await s3.send(new CopyObjectCommand({
+    Bucket:     config.s3Bucket,
+    Key:        latestKey,
+    CopySource: `/${config.s3Bucket}/${key}`,
+    MetadataDirective: "COPY",
   }));
 
   return key;

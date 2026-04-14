@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -8,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +22,7 @@ import (
 	collabpb "github.com/flow-note/api-contracts/generated/proto/collab/v1"
 	commentpb "github.com/flow-note/api-contracts/generated/proto/comment/v1"
 	mediapb "github.com/flow-note/api-contracts/generated/proto/media/v1"
+	notifypb "github.com/flow-note/api-contracts/generated/proto/notify/v1"
 	sec "github.com/flow-note/common/authsecurity"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -39,6 +42,10 @@ type fakeCommentServer struct {
 
 type fakeMediaServer struct {
 	mediapb.UnimplementedMediaServiceServer
+}
+
+type fakeNotifyServer struct {
+	notifypb.UnimplementedNotificationServiceServer
 }
 
 func (s *fakeAuthServer) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.AuthResponse, error) {
@@ -129,11 +136,23 @@ func (s *fakeMediaServer) GetMediaUploadUrl(ctx context.Context, req *mediapb.Ge
 	return &mediapb.GetMediaUploadUrlResponse{UploadUrl: "http://example.com/upload", MediaId: "media-1"}, nil
 }
 
+func (s *fakeNotifyServer) StreamNotification(_ *emptypb.Empty, stream grpc.ServerStreamingServer[notifypb.Notification]) error {
+	return stream.Send(&notifypb.Notification{
+		Id:     "notification-1",
+		UserId: "11111111-1111-1111-1111-111111111111",
+		Type:   notifypb.NotificationType_NOTIFICATION_TYPE_MENTION_PAGE,
+		Payload: &notifypb.NotificationPayload{
+			PageId: "22222222-2222-2222-2222-222222222222",
+		},
+	})
+}
+
 func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 	authAddr := startAuthTestGRPCServer(t)
 	collabAddr := startCollabTestGRPCServer(t)
 	commentAddr := startCommentTestGRPCServer(t)
 	mediaAddr := startMediaTestGRPCServer(t)
+	notifyAddr := startNotifyTestGRPCServer(t)
 	keyPath, _ := createGatewayTestKeyPair(t)
 	httpAddr := freeTCPAddr(t)
 
@@ -141,15 +160,16 @@ func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 	defer cancel()
 
 	a := New(Config{
-		HTTPAddr:      httpAddr,
-		AuthGRPCAddr:  authAddr,
-		CollabGRPCAddr: collabAddr,
+		HTTPAddr:        httpAddr,
+		AuthGRPCAddr:    authAddr,
+		CollabGRPCAddr:  collabAddr,
 		CommentGRPCAddr: commentAddr,
-		MediaGRPCAddr: mediaAddr,
-		CollabAddr:    "127.0.0.1:4000",
-		PublicKeyPath: keyPath,
-		JWTIssuer:     "todo-auth",
-		JWTAudience:   "todo-api",
+		MediaGRPCAddr:   mediaAddr,
+		NotifyGRPCAddr:  notifyAddr,
+		CollabAddr:      "127.0.0.1:4000",
+		PublicKeyPath:   keyPath,
+		JWTIssuer:       "todo-auth",
+		JWTAudience:     "todo-api",
 	})
 
 	errCh := make(chan error, 1)
@@ -186,6 +206,78 @@ func TestRunServesHealthAndProxiesAuth(t *testing.T) {
 	_ = resp.Body.Close()
 	if authBody["user"] == nil {
 		t.Fatal("expected user field in auth response")
+	}
+
+	cancel()
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("gateway run: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("gateway did not stop in time")
+	}
+}
+
+func TestRunStreamsNotificationsAsSSE(t *testing.T) {
+	authAddr := startAuthTestGRPCServer(t)
+	collabAddr := startCollabTestGRPCServer(t)
+	commentAddr := startCommentTestGRPCServer(t)
+	mediaAddr := startMediaTestGRPCServer(t)
+	notifyAddr := startNotifyTestGRPCServer(t)
+	keyPath, token := createGatewayTestKeyPair(t)
+	httpAddr := freeTCPAddr(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	a := New(Config{
+		HTTPAddr:        httpAddr,
+		AuthGRPCAddr:    authAddr,
+		CollabGRPCAddr:  collabAddr,
+		CommentGRPCAddr: commentAddr,
+		MediaGRPCAddr:   mediaAddr,
+		NotifyGRPCAddr:  notifyAddr,
+		CollabAddr:      "127.0.0.1:4000",
+		PublicKeyPath:   keyPath,
+		JWTIssuer:       "todo-auth",
+		JWTAudience:     "todo-api",
+	})
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- a.Run(ctx)
+	}()
+
+	waitForHTTP(t, "http://"+httpAddr+"/healthz")
+
+	req, err := http.NewRequest(http.MethodGet, "http://"+httpAddr+"/v1/notifications/stream", nil)
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("stream request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if got := resp.Header.Get("Content-Type"); !strings.Contains(got, "text/event-stream") {
+		t.Fatalf("expected sse content-type, got %q", got)
+	}
+
+	reader := bufio.NewReader(resp.Body)
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("read stream body: %v", err)
+	}
+	text := string(body)
+	if !strings.Contains(text, "event: notification") {
+		t.Fatalf("expected notification event, got %q", text)
+	}
+	if !strings.Contains(text, "\"id\":\"notification-1\"") {
+		t.Fatalf("expected notification payload, got %q", text)
 	}
 
 	cancel()
@@ -250,6 +342,20 @@ func startMediaTestGRPCServer(t *testing.T) string {
 	}
 	srv := grpc.NewServer()
 	mediapb.RegisterMediaServiceServer(srv, &fakeMediaServer{})
+	go func() { _ = srv.Serve(lis) }()
+	t.Cleanup(srv.Stop)
+	return lis.Addr().String()
+}
+
+func startNotifyTestGRPCServer(t *testing.T) string {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		skipIfListenForbidden(t, err)
+		t.Fatalf("listen notify grpc: %v", err)
+	}
+	srv := grpc.NewServer()
+	notifypb.RegisterNotificationServiceServer(srv, &fakeNotifyServer{})
 	go func() { _ = srv.Serve(lis) }()
 	t.Cleanup(srv.Stop)
 	return lis.Addr().String()

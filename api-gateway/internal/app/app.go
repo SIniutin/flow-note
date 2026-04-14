@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	authpb    "github.com/flow-note/api-contracts/generated/proto/auth/v1"
-	collabpb  "github.com/flow-note/api-contracts/generated/proto/collab/v1"
+	authpb "github.com/flow-note/api-contracts/generated/proto/auth/v1"
+	collabpb "github.com/flow-note/api-contracts/generated/proto/collab/v1"
 	commentpb "github.com/flow-note/api-contracts/generated/proto/comment/v1"
-	mediapb   "github.com/flow-note/api-contracts/generated/proto/media/v1"
-	notifypb  "github.com/flow-note/api-contracts/generated/proto/notify/v1"
-	pagespb   "github.com/flow-note/api-contracts/generated/proto/page/v1"
+	mediapb "github.com/flow-note/api-contracts/generated/proto/media/v1"
+	notifypb "github.com/flow-note/api-contracts/generated/proto/notify/v1"
+	pagespb "github.com/flow-note/api-contracts/generated/proto/page/v1"
 	"github.com/flow-note/api-gateway/internal/handlers"
 	"github.com/flow-note/api-gateway/internal/middleware"
 	p "github.com/flow-note/api-gateway/internal/policy"
@@ -69,6 +69,14 @@ func (a *App) Run(ctx context.Context) error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 
+	notifyConn, err := grpc.NewClient(a.cfg.NotifyGRPCAddr, dialOpts...)
+	if err != nil {
+		logger.Error("failed to connect notify service", zap.Error(err))
+		return err
+	}
+	defer notifyConn.Close()
+	notifyClient := notifypb.NewNotificationServiceClient(notifyConn)
+
 	if err := authpb.RegisterAuthServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.AuthGRPCAddr, dialOpts); err != nil {
 		logger.Error("failed to register auth service", zap.Error(err))
 		return err
@@ -89,7 +97,7 @@ func (a *App) Run(ctx context.Context) error {
 		logger.Error("failed to register pages service", zap.Error(err))
 		return err
 	}
-	if err := notifypb.RegisterNotifyServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.NotifyGRPCAddr, dialOpts); err != nil {
+	if err := notifypb.RegisterNotificationServiceHandlerFromEndpoint(ctx, grpcgw, a.cfg.NotifyGRPCAddr, dialOpts); err != nil {
 		logger.Error("failed to register notify service", zap.Error(err))
 		return err
 	}
@@ -108,6 +116,7 @@ func (a *App) Run(ctx context.Context) error {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok"))
 	}))
+	mux.Handle("/v1/notifications/stream", handlers.NewNotifySSE(notifyClient, logger))
 	mux.Handle("/", grpcgw)
 
 	// Chain: PolicyAuth → permCache → grpcgw
@@ -133,16 +142,16 @@ func (a *App) Run(ctx context.Context) error {
 	handler = cr.RecoveryMiddleware(logger)(handler)
 
 	logger.Info("api-gateway listening",
-		zap.String("http_addr",      a.cfg.HTTPAddr),
-		zap.String("auth_grpc",      a.cfg.AuthGRPCAddr),
-		zap.String("pages_grpc",     a.cfg.PagesGRPCAddr),
-		zap.String("comment_grpc",   a.cfg.CommentGRPCAddr),
-		zap.String("media_grpc",     a.cfg.MediaGRPCAddr),
-		zap.String("notify_grpc",    a.cfg.NotifyGRPCAddr),
-		zap.String("collab_grpc",    a.cfg.CollabGRPCAddr),
-		zap.String("collab_ws",      a.cfg.CollabAddr),
+		zap.String("http_addr", a.cfg.HTTPAddr),
+		zap.String("auth_grpc", a.cfg.AuthGRPCAddr),
+		zap.String("pages_grpc", a.cfg.PagesGRPCAddr),
+		zap.String("comment_grpc", a.cfg.CommentGRPCAddr),
+		zap.String("media_grpc", a.cfg.MediaGRPCAddr),
+		zap.String("notify_grpc", a.cfg.NotifyGRPCAddr),
+		zap.String("collab_grpc", a.cfg.CollabGRPCAddr),
+		zap.String("collab_ws", a.cfg.CollabAddr),
 		zap.String("allowed_origin", a.cfg.AllowedOrigin),
-		zap.String("redis",          a.cfg.RedisURL),
+		zap.String("redis", a.cfg.RedisURL),
 	)
 
 	return cr.ServeHTTP(ctx, a.cfg.HTTPAddr, handler)

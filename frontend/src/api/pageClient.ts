@@ -1,74 +1,54 @@
-// ─── src/api/pageClient.ts ────────────────────────────────────────────────────
-// REST client for page-service (gRPC-gateway REST).
-
 import { getAccessToken } from "../data/authStore";
-
-function authHeaders(): Record<string, string> {
-    const token = getAccessToken();
-    return token
-        ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
-        : { "Content-Type": "application/json" };
-}
-
-async function req<T>(url: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(url, { ...init, headers: { ...authHeaders(), ...init?.headers } });
-    if (!res.ok) throw new Error(`[pageClient] ${res.status} ${url}`);
-    return res.json() as Promise<T>;
-}
 
 export interface BackendPage {
     id:        string;
     title:     string;
-    ownerId?:  string;
+    ownerId:   string;
     createdAt: string;
     updatedAt: string;
 }
 
-export interface BackendPageLink {
-    id:         string;
-    fromPageId: string;
-    toPageId:   string;
-    blockId:    string;
+async function authFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const token = getAccessToken();
+    const headers: Record<string, string> = { ...(init.headers as Record<string, string> ?? {}) };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    if (init.body) headers["Content-Type"] = "application/json";
+
+    const res = await fetch(path, { ...init, headers });
+    if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let message = text;
+        try { message = JSON.parse(text).message ?? text; } catch { /* raw text */ }
+        throw new Error(message || `HTTP ${res.status}`);
+    }
+    if (res.status === 204) return undefined as T;
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.includes("application/json")) return undefined as T;
+    return res.json() as T;
 }
 
-export interface BackendVersion {
-    id:     number;
-    pageId: string;
-    date:   string;
-    size:   number;
+export interface PagePermission {
+    id:        string;
+    pageId:    string;
+    userId:    string;
+    role:      string;
+    grantedBy: string;
 }
 
 export const pageClient = {
-    // GET /v1/pages/allowed
     listAllowed(): Promise<{ pages: BackendPage[] }> {
-        return req("/v1/pages/allowed");
+        return authFetch("/v1/pages/allowed?pagination.limit=100&pagination.offset=0");
     },
 
-    // POST /v1/pages
     create(title: string): Promise<{ page: BackendPage }> {
-        return req("/v1/pages", {
-            method: "POST",
-            body: JSON.stringify({ title }),
-        });
+        return authFetch("/v1/pages", { method: "POST", body: JSON.stringify({ title }) });
     },
 
-    // DELETE /v1/pages/{page_id}
-    delete(id: string): Promise<void> {
-        return req(`/v1/pages/${id}`, { method: "DELETE" });
+    delete(pageId: string): Promise<void> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}`, { method: "DELETE" });
     },
 
-    // GET /v1/pages/{page_id}/connected — входящие и исходящие ссылки
-    getConnected(pageId: string): Promise<{ pages: BackendPage[]; links: BackendPageLink[] }> {
-        return req(`/v1/pages/${pageId}/connected`);
+    listPermissions(pageId: string): Promise<{ permissions: PagePermission[] }> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/permissions`);
     },
-
-    // GET /v1/pages/{page_id}/versions
-    listVersions(pageId: string): Promise<{ versions: BackendVersion[] }> {
-        return req(`/v1/pages/${pageId}/versions`);
-    },
-
-    // GET /v1/pages/{page_id}/versions/latest
-    getLastVersion(pageId: string): Promise<{ version: BackendVersion }> {
-        return req(`/v1/pages/${pageId}/versions/latest`);
-    },
-} as const;
+};
