@@ -348,7 +348,7 @@ services:
       JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
       JWT_ISSUER: "flow-note-auth"
       JWT_AUDIENCE: "flow-note-api"
-      ALLOWED_ORIGIN: "http://localhost:5173"
+      ALLOWED_ORIGIN: ""
     secrets:
       - jwt_public_key
     depends_on:

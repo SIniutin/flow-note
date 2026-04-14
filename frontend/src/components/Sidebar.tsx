@@ -1,9 +1,64 @@
 // ─── src/components/Sidebar.tsx ───────────────────────────────────────────────
-// Боковая панель навигации по вики-страницам.
 
 import { useState, useRef, useEffect } from "react";
 import { usePages, pagesStore, type WikiPage } from "../data/pagesStore";
 import "./sidebar.css";
+
+// ── SVG icons ─────────────────────────────────────────────────────────────────
+
+function IconSearch() {
+    return (
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round">
+            <circle cx="6.5" cy="6.5" r="4.5"/>
+            <line x1="10.5" y1="10.5" x2="14" y2="14"/>
+        </svg>
+    );
+}
+
+function IconPencil() {
+    return (
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11.5 2.5a1.5 1.5 0 0 1 2 2L5 13H3v-2L11.5 2.5z"/>
+        </svg>
+    );
+}
+
+function IconTrash() {
+    return (
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3,5 13,5"/>
+            <path d="M5 5V3h6v2"/>
+            <path d="M4 5l1 9h6l1-9"/>
+        </svg>
+    );
+}
+
+function IconChevronRight() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6,4 10,8 6,12"/>
+        </svg>
+    );
+}
+
+function IconChevronLeft() {
+    return (
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="10,4 6,8 10,12"/>
+        </svg>
+    );
+}
+
+function IconPlus() {
+    return (
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="8" y1="3" x2="8" y2="13"/>
+            <line x1="3" y1="8" x2="13" y2="8"/>
+        </svg>
+    );
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 interface SidebarProps {
     currentPageId: string;
@@ -48,7 +103,7 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
 
     function handleDelete(id: string, e: React.MouseEvent) {
         e.stopPropagation();
-        if (pages.length <= 1) return; // не удаляем последнюю
+        if (pages.length <= 1) return;
         if (!confirm("Удалить страницу?")) return;
         const nextId = pages.find(p => p.id !== id)?.id;
         pagesStore.delete(id);
@@ -57,43 +112,53 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
 
     if (collapsed) {
         return (
-            <aside className="sidebar sidebar--collapsed">
-                <button className="sidebar__toggle" onClick={onToggle} title="Развернуть панель">
-                    <span>›</span>
-                </button>
-            </aside>
+            <button className="sidebar__collapsed-btn" onClick={onToggle} title="Открыть панель">
+                <IconChevronRight/>
+            </button>
         );
     }
 
     return (
         <aside className="sidebar">
+            {/* Header */}
             <div className="sidebar__header">
-                <span className="sidebar__logo">FlowNote</span>
+                <div className="sidebar__workspace-icon">F</div>
+                <div className="sidebar__workspace-info">
+                    <span className="sidebar__logo">FlowNote</span>
+                    <span className="sidebar__plan">Workspace</span>
+                </div>
                 <button className="sidebar__toggle" onClick={onToggle} title="Свернуть панель">
-                    <span>‹</span>
+                    <IconChevronLeft/>
                 </button>
             </div>
 
+            {/* Search */}
             <div className="sidebar__search-wrap">
-                <input
-                    className="sidebar__search"
-                    placeholder="Поиск страниц…"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                />
+                <div className="sidebar__search-inner">
+                    <span className="sidebar__search-icon"><IconSearch/></span>
+                    <input
+                        className="sidebar__search"
+                        placeholder="Поиск страниц…"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                    />
+                </div>
             </div>
+
+            {/* Pages section */}
+            <div className="sidebar__section-label">Страницы</div>
 
             <nav className="sidebar__nav">
                 {filtered.length === 0 && (
-                    <div className="sidebar__empty">Страниц не найдено</div>
+                    <div className="sidebar__empty">
+                        {search ? "Ничего не найдено" : "Нет страниц"}
+                    </div>
                 )}
                 {filtered.map(page => (
                     <div
                         key={page.id}
                         className={`sidebar__item${page.id === currentPageId ? " sidebar__item--active" : ""}`}
-                        onClick={() => {
-                            if (editingId !== page.id) onNavigate(page.id);
-                        }}
+                        onClick={() => { if (editingId !== page.id) onNavigate(page.id); }}
                     >
                         <span className="sidebar__item-icon">{page.icon ?? "📄"}</span>
 
@@ -118,20 +183,28 @@ export function Sidebar({ currentPageId, onNavigate, collapsed, onToggle }: Side
                             <button
                                 title="Переименовать"
                                 onClick={e => { e.stopPropagation(); handleRename(page); }}
-                            >✏️</button>
+                            >
+                                <IconPencil/>
+                            </button>
                             <button
+                                className="danger"
                                 title="Удалить"
                                 onClick={e => handleDelete(page.id, e)}
                                 disabled={pages.length <= 1}
-                            >🗑️</button>
+                            >
+                                <IconTrash/>
+                            </button>
                         </div>
                     </div>
                 ))}
             </nav>
 
-            <button className="sidebar__new-page" onClick={handleCreate}>
-                + Новая страница
-            </button>
+            {/* Footer */}
+            <div className="sidebar__footer">
+                <button className="sidebar__new-page" onClick={handleCreate}>
+                    <IconPlus/> Новая страница
+                </button>
+            </div>
         </aside>
     );
 }
