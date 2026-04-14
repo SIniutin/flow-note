@@ -6,7 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import Collaboration from "@tiptap/extension-collaboration";
-import CollaborationCursor from "@tiptap/extension-collaboration-cursor";
+import { CollaborationCursorExtension } from "./collab/CollaborationCursorExtension";
 import { Extension } from "@tiptap/core";
 
 import { BlockIdExtension }          from "./schema/BlockIdExtension";
@@ -113,13 +113,7 @@ export function createEditorExtensions(currentUser: User) {
         // ydoc — live binding: connectCollab() обновляет значение,
         // поэтому при перемонтировании редактора используется новый doc.
         Collaboration.configure({ document: ydoc }),
-        CollaborationCursor.configure({
-            provider: { awareness } as never,
-            user: {
-                name:  currentUser.name,
-                color: AVATAR_COLORS[currentUser.colorIndex],
-            },
-        }),
+        CollaborationCursorExtension,
 
         // ── Keyboard shortcuts ────────────────────────────────────────────
         KeyboardShortcuts,

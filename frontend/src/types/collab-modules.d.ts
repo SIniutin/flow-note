@@ -97,7 +97,19 @@ declare module "@tiptap/extension-collaboration-cursor" {
 }
 
 declare module "@tiptap/y-tiptap" {
+    import type { Awareness } from "y-protocols/awareness";
+    import type { Plugin } from "@tiptap/pm/state";
+
     export function ySyncPlugin(...args: unknown[]): unknown;
 
     export function yUndoPlugin(...args: unknown[]): unknown;
+
+    interface CursorPluginOptions {
+        awarenessStateFilter?: (currentClientId: number, userClientId: number, user: unknown) => boolean;
+        cursorBuilder?: (user: { name?: string; color?: string }, clientId: number) => HTMLElement;
+        selectionBuilder?: (user: { name?: string; color?: string }, clientId: number) => Record<string, string>;
+        getSelection?: (state: unknown) => unknown;
+    }
+
+    export function yCursorPlugin(awareness: Awareness, options?: CursorPluginOptions, cursorStateField?: string): Plugin;
 }
