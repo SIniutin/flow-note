@@ -16,10 +16,10 @@ const listeners = new Set<() => void>();
 function notify() { listeners.forEach(l => l()); }
 
 function persist(tokens: TokenPair) {
-    _accessToken  = tokens.access_token;
-    _refreshToken = tokens.refresh_token;
-    localStorage.setItem(LS_ACCESS,  tokens.access_token);
-    localStorage.setItem(LS_REFRESH, tokens.refresh_token);
+    _accessToken  = tokens.accessToken;
+    _refreshToken = tokens.refreshToken;
+    localStorage.setItem(LS_ACCESS,  tokens.accessToken);
+    localStorage.setItem(LS_REFRESH, tokens.refreshToken);
 }
 
 function wipe() {
