@@ -44,7 +44,7 @@ func New(cfg config.Config) (*App, error) {
 	commentsRepo := repository.NewPostgres(dbPool)
 	commentsService := commentservice.New(dbPool, commentsRepo, commentsRepo)
 	srv := grpc.NewServer()
-	commentv1.RegisterCommentServiceServer(srv, grpcHandler.New(commentsService))
+	commentv1.RegisterCommentServiceServer(srv, grpcHandler.New(commentsService, logger))
 	reflection.Register(srv)
 	return &App{
 		Config:   cfg,

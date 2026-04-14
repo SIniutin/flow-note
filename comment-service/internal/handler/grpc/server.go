@@ -9,6 +9,7 @@ import (
 	commentservice "github.com/flow-note/comment-service/internal/service"
 	"github.com/flow-note/common/authctx"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -19,78 +20,186 @@ type Server struct {
 	commentv1.UnimplementedCommentServiceServer
 
 	service *commentservice.Service
+	logger  *zap.Logger
 }
 
-func New(service *commentservice.Service) *Server {
-	return &Server{service: service}
+func New(service *commentservice.Service, logger *zap.Logger) *Server {
+	return &Server{
+		service: service,
+		logger:  logger,
+	}
 }
 
 func (s *Server) MakeComment(ctx context.Context, req *commentv1.CreateCommentRequest) (*commentv1.CreateCommentResponce, error) {
+	s.logger.Info("comment grpc request",
+		zap.String("method", "MakeComment"),
+		zap.String("page_id", req.GetPageId()),
+		zap.String("parent_id", req.GetParentId()),
+		zap.String("body_id", req.GetBodyId()),
+		zap.Int("body_len", len(req.GetBody())),
+	)
+
 	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
 	if err != nil {
+		s.logger.Warn("comment grpc auth failed",
+			zap.String("method", "MakeComment"),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	cmd, err := toCreateCommentCommand(req, cred.UserId)
 	if err != nil {
+		s.logger.Warn("comment grpc bad request",
+			zap.String("method", "MakeComment"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	comment, err := s.service.MakeComment(ctx, cred, cmd)
 	if err != nil {
+		s.logger.Warn("comment grpc failed",
+			zap.String("method", "MakeComment"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.String("page_id", req.GetPageId()),
+			zap.Error(err),
+		)
 		return nil, mapDomainError(err)
 	}
+
+	s.logger.Info("comment grpc success",
+		zap.String("method", "MakeComment"),
+		zap.String("user_id", cred.UserId.String()),
+		zap.String("comment_id", comment.ID.String()),
+		zap.String("page_id", comment.PageID.String()),
+	)
 
 	return &commentv1.CreateCommentResponce{Comment: toProtoComment(comment)}, nil
 }
 
 func (s *Server) SubscribeToComment(ctx context.Context, req *commentv1.SubscribeToCommentRequest) (*emptypb.Empty, error) {
+	s.logger.Info("comment grpc request",
+		zap.String("method", "SubscribeToComment"),
+		zap.String("page_id", req.GetPageId()),
+	)
+
 	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
 	if err != nil {
+		s.logger.Warn("comment grpc auth failed",
+			zap.String("method", "SubscribeToComment"),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	cmd, err := toSubscribeCommand(cred.UserId, req.GetPageId())
 	if err != nil {
+		s.logger.Warn("comment grpc bad request",
+			zap.String("method", "SubscribeToComment"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	if err := s.service.SubscribeToComments(ctx, cred, cmd); err != nil {
+		s.logger.Warn("comment grpc failed",
+			zap.String("method", "SubscribeToComment"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.String("page_id", req.GetPageId()),
+			zap.Error(err),
+		)
 		return nil, mapDomainError(err)
 	}
+
+	s.logger.Info("comment grpc success",
+		zap.String("method", "SubscribeToComment"),
+		zap.String("user_id", cred.UserId.String()),
+		zap.String("page_id", req.GetPageId()),
+	)
+
 	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) UnsubscribeToComment(ctx context.Context, req *commentv1.UnsubscribeToCommentRequest) (*emptypb.Empty, error) {
+	s.logger.Info("comment grpc request",
+		zap.String("method", "UnsubscribeToComment"),
+		zap.String("page_id", req.GetPageId()),
+	)
+
 	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
 	if err != nil {
+		s.logger.Warn("comment grpc auth failed",
+			zap.String("method", "UnsubscribeToComment"),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	cmd, err := toUnsubscribeCommand(cred.UserId, req.GetPageId())
 	if err != nil {
+		s.logger.Warn("comment grpc bad request",
+			zap.String("method", "UnsubscribeToComment"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	if err := s.service.UnsubscribeFromComments(ctx, cred, cmd); err != nil {
+		s.logger.Warn("comment grpc failed",
+			zap.String("method", "UnsubscribeToComment"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.String("page_id", req.GetPageId()),
+			zap.Error(err),
+		)
 		return nil, mapDomainError(err)
 	}
+
+	s.logger.Info("comment grpc success",
+		zap.String("method", "UnsubscribeToComment"),
+		zap.String("user_id", cred.UserId.String()),
+		zap.String("page_id", req.GetPageId()),
+	)
+
 	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) ListComments(ctx context.Context, req *commentv1.ListCommentsRequest) (*commentv1.ListCommentsResponse, error) {
+	s.logger.Info("comment grpc request",
+		zap.String("method", "ListComments"),
+		zap.String("page_id", req.GetPageId()),
+	)
+
 	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
 	if err != nil {
+		s.logger.Warn("comment grpc auth failed",
+			zap.String("method", "ListComments"),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	pageID, err := parseUUID(req.GetPageId(), "page_id")
 	if err != nil {
+		s.logger.Warn("comment grpc bad request",
+			zap.String("method", "ListComments"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	items, err := s.service.ListComments(ctx, cred, domain.ListCommentsQuery{PageID: pageID})
 	if err != nil {
+		s.logger.Warn("comment grpc failed",
+			zap.String("method", "ListComments"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.String("page_id", req.GetPageId()),
+			zap.Error(err),
+		)
 		return nil, mapDomainError(err)
 	}
 
@@ -99,24 +208,57 @@ func (s *Server) ListComments(ctx context.Context, req *commentv1.ListCommentsRe
 		out = append(out, toProtoComment(item))
 	}
 
+	s.logger.Info("comment grpc success",
+		zap.String("method", "ListComments"),
+		zap.String("user_id", cred.UserId.String()),
+		zap.String("page_id", req.GetPageId()),
+		zap.Int("count", len(out)),
+	)
+
 	return &commentv1.ListCommentsResponse{Comments: out}, nil
 }
 
 func (s *Server) GetComment(ctx context.Context, req *commentv1.GetCommentRequest) (*commentv1.GetCommentResponce, error) {
+	s.logger.Info("comment grpc request",
+		zap.String("method", "GetComment"),
+		zap.String("comment_id", req.GetCommentId()),
+	)
+
 	cred, err := authctx.ParseUserIDAndPermissionRole(ctx)
 	if err != nil {
+		s.logger.Warn("comment grpc auth failed",
+			zap.String("method", "GetComment"),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	commentID, err := parseUUID(req.GetCommentId(), "comment_id")
 	if err != nil {
+		s.logger.Warn("comment grpc bad request",
+			zap.String("method", "GetComment"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
 	comment, err := s.service.GetComment(ctx, cred, commentID)
 	if err != nil {
+		s.logger.Warn("comment grpc failed",
+			zap.String("method", "GetComment"),
+			zap.String("user_id", cred.UserId.String()),
+			zap.String("comment_id", req.GetCommentId()),
+			zap.Error(err),
+		)
 		return nil, mapDomainError(err)
 	}
+
+	s.logger.Info("comment grpc success",
+		zap.String("method", "GetComment"),
+		zap.String("user_id", cred.UserId.String()),
+		zap.String("comment_id", comment.ID.String()),
+	)
 
 	return &commentv1.GetCommentResponce{Comment: toProtoComment(comment)}, nil
 }

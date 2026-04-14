@@ -13,6 +13,7 @@ RUN go mod download
 
 COPY notify-service/cmd        ./cmd
 COPY notify-service/internal   ./internal
+COPY notify-service/db         ./db
 
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/notify-service ./cmd/notify-service
 
