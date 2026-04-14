@@ -4,13 +4,13 @@ export interface AuthUser {
     id: string;
     email: string;
     login: string;
-    created_at: string;
-    updated_at: string;
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface TokenPair {
-    access_token: string;
-    refresh_token: string;
+    accessToken: string;
+    refreshToken: string;
 }
 
 export interface AuthResponse {
