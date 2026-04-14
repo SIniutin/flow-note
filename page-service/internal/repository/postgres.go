@@ -78,10 +78,10 @@ func (r *Repository) CreatePageWithPermission(ctx context.Context, title string,
 	}
 
 	const permQuery = `
-		INSERT INTO page_permissions (page_id, user_id, role)
-		VALUES ($1, $2, $3)
+		INSERT INTO page_permissions (page_id, user_id, role, granted_by)
+		VALUES ($1, $2, $3, $4)
 	`
-	if _, err := tx.Exec(ctx, permQuery, page.ID, ownerID, string(perm.RoleOwner)); err != nil {
+	if _, err := tx.Exec(ctx, permQuery, page.ID, ownerID, string(perm.RoleOwner), ownerID); err != nil {
 		return nil, err
 	}
 
