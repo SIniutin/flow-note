@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flow-note/common/events"
+	"github.com/flow-note/common/broker"
 	"github.com/flow-note/notify-service/internal/domain"
 	port "github.com/flow-note/notify-service/internal/domain/interfaces"
 	"github.com/google/uuid"
 )
 
-// ProcessEvent converts an incoming domain event into one or more notifications,
-// persists them idempotently, and fans out real-time delivery per recipient.
+// ProcessEvent converts an incoming domain event into a notification,
+// persists it idempotently, and delivers it in real-time to the recipient.
 type ProcessEvent struct {
 	repo      port.NotificationRepository
 	publisher port.EventPublisher
@@ -23,20 +23,20 @@ func NewProcessEvent(repo port.NotificationRepository, publisher port.EventPubli
 	return &ProcessEvent{repo: repo, publisher: publisher}
 }
 
-func (uc *ProcessEvent) Execute(ctx context.Context, envelope events.Envelope) error {
-	items, err := uc.route(ctx, envelope)
+func (uc *ProcessEvent) Execute(ctx context.Context, eventID uuid.UUID, event broker.Event) error {
+	n, err := uc.route(event)
 	if err != nil {
 		return err
 	}
-	if len(items) == 0 {
+	if n == nil {
 		return nil
 	}
 
 	saved, err := uc.repo.SaveEventNotifications(ctx, domain.ProcessedEvent{
-		EventID:     envelope.EventID,
-		EventType:   envelope.EventType,
+		EventID:     eventID,
+		EventType:   string(event.Type),
 		ProcessedAt: time.Now().UTC(),
-	}, items)
+	}, []domain.Notification{*n})
 	if err != nil {
 		return err
 	}
@@ -48,88 +48,69 @@ func (uc *ProcessEvent) Execute(ctx context.Context, envelope events.Envelope) e
 	if uc.publisher == nil {
 		return nil
 	}
-	for _, item := range items {
-		channel := "notifications:" + item.UserID.String()
-		if err := uc.publisher.PublishUser(ctx, channel, item); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	channel := "notifications:" + n.UserID.String()
+	return uc.publisher.PublishUser(ctx, channel, *n)
 }
 
-func (uc *ProcessEvent) route(_ context.Context, envelope events.Envelope) ([]domain.Notification, error) {
-	basePayload, err := buildPayload(envelope)
+func (uc *ProcessEvent) route(event broker.Event) (*domain.Notification, error) {
+	userID, err := uuid.Parse(event.UserID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid user_id %q: %w", event.UserID, err)
 	}
 
-	make_ := func(userID uuid.UUID, kind domain.NotificationType) domain.Notification {
-		n := domain.Notification{
-			ID:          uuid.New(),
-			UserID:      userID,
-			Type:        kind,
-			ActorUserID: envelope.ActorUserID,
-			PageID:      envelope.PageID,
-			ThreadID:    envelope.ThreadID,
-			CommentID:   envelope.CommentID,
-			Payload:     basePayload,
-			CreatedAt:   envelope.OccurredAt,
-		}
-		if n.CreatedAt.IsZero() {
-			n.CreatedAt = time.Now().UTC()
-		}
-		if envelope.DedupeKey != "" {
-			key := fmt.Sprintf("%s:%s", envelope.DedupeKey, userID.String())
-			n.DedupeKey = &key
-		}
-		return n
-	}
-
-	switch envelope.EventType {
-	case events.EventCommentMentionCreated:
-		if envelope.MentionedUserID == nil {
-			return nil, nil
-		}
-		return []domain.Notification{make_(*envelope.MentionedUserID, domain.NotificationMentionComment)}, nil
-
-	case events.EventPageMentionCreated:
-		if envelope.MentionedUserID == nil {
-			return nil, nil
-		}
-		return []domain.Notification{make_(*envelope.MentionedUserID, domain.NotificationMentionPage)}, nil
-
-	case events.EventCommentCreated, events.EventCommentReplyCreated:
-		kind := domain.NotificationCommentNew
-		if envelope.EventType == events.EventCommentReplyCreated {
-			kind = domain.NotificationCommentReply
-		}
-		items := make([]domain.Notification, 0, len(envelope.RecipientsHint))
-		for _, recipient := range envelope.RecipientsHint {
-			items = append(items, make_(recipient, kind))
-		}
-		return items, nil
-
+	var kind domain.NotificationType
+	switch event.Type {
+	case broker.EventMentionComment, broker.EventCommentMention:
+		kind = domain.NotificationMentionComment
+	case broker.EventMentionPage:
+		kind = domain.NotificationMentionPage
+	case broker.EventCommentThread:
+		kind = domain.NotificationCommentNew
+	case broker.EventCommentReply:
+		kind = domain.NotificationCommentReply
 	default:
 		return nil, nil
 	}
+
+	n := &domain.Notification{
+		ID:        uuid.New(),
+		UserID:    userID,
+		Type:      kind,
+		CreatedAt: time.Now().UTC(),
+	}
+
+	if event.ActorID != "" {
+		if id, err := uuid.Parse(event.ActorID); err == nil {
+			n.ActorUserID = &id
+		}
+	}
+	if event.PageID != "" {
+		if id, err := uuid.Parse(event.PageID); err == nil {
+			n.PageID = &id
+		}
+	}
+	if event.EntityID != "" {
+		if id, err := uuid.Parse(event.EntityID); err == nil {
+			n.CommentID = &id
+		}
+	}
+
+	payload, err := buildPayload(event)
+	if err != nil {
+		return nil, err
+	}
+	n.Payload = payload
+
+	return n, nil
 }
 
-func buildPayload(envelope events.Envelope) (json.RawMessage, error) {
-	payload := map[string]any{}
-	if envelope.PageID != nil {
-		payload["page_id"] = envelope.PageID.String()
+func buildPayload(event broker.Event) (json.RawMessage, error) {
+	m := map[string]any{}
+	if event.PageID != "" {
+		m["page_id"] = event.PageID
 	}
-	if envelope.CommentID != nil {
-		payload["entity_id"] = envelope.CommentID.String()
-	} else if envelope.ThreadID != nil {
-		payload["entity_id"] = envelope.ThreadID.String()
+	if event.EntityID != "" {
+		m["entity_id"] = event.EntityID
 	}
-	if len(envelope.Payload) > 0 {
-		payload["event_payload"] = json.RawMessage(envelope.Payload)
-	}
-	if envelope.Preview != "" {
-		payload["preview"] = envelope.Preview
-	}
-	return json.Marshal(payload)
+	return json.Marshal(m)
 }

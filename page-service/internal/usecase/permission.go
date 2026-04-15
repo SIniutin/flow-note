@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/broker"
 	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -49,6 +50,14 @@ func (s *Service) GrantPagePermission(ctx context.Context, credentials *authctx.
 		return nil, err
 	}
 
+	if err := s.rabbit.Publish(ctx, broker.Event{
+		UserID:  userID.String(),
+		ActorID: credentials.UserId.String(),
+		PageID:  pageID.String(),
+		Type:    broker.EventGrandPermission,
+	}); err != nil {
+		s.logger.Warn("GrantPagePermission publish failed", zap.Error(err))
+	}
 	return permission, nil
 }
 
@@ -76,6 +85,14 @@ func (s *Service) RevokePagePermission(ctx context.Context, credentials *authctx
 		return err
 	}
 
+	if err := s.rabbit.Publish(ctx, broker.Event{
+		UserID:  userID.String(),
+		ActorID: credentials.UserId.String(),
+		PageID:  pageID.String(),
+		Type:    broker.EventRevokePermission,
+	}); err != nil {
+		s.logger.Warn("EventRevokePermission publish failed", zap.Error(err))
+	}
 	return nil
 }
 

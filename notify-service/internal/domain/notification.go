@@ -8,12 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// ErrNotificationNotFound is returned when a notification does not exist or
-// does not belong to the requesting user.
 var ErrNotificationNotFound = errors.New("notification not found")
 
-// NotificationType mirrors the proto NotificationType enum.
-// Values are stored verbatim in the DB type column.
 type NotificationType string
 
 const (

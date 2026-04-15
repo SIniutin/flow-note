@@ -33,8 +33,9 @@ type JWTConfig struct {
 }
 
 type RabbitConfig struct {
-	Url      string
-	Exchange string
+	Url       string
+	Exchange  string
+	QueueName string
 }
 
 type Config struct {
@@ -111,6 +112,10 @@ func MustLoad() Config {
 
 	if value, ok := os.LookupEnv("RABBIT_EXCHANGE"); ok {
 		cfg.Rabbit.Exchange = value
+	}
+
+	if value, ok := os.LookupEnv("NOTIFY_BROKER_QUEUE"); ok {
+		cfg.Rabbit.QueueName = value
 	}
 
 	return cfg

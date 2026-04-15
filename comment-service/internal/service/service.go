@@ -9,21 +9,33 @@ import (
 	"github.com/flow-note/comment-service/internal/repository"
 	"github.com/flow-note/common/apperrors"
 	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/broker"
 	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 )
+
+type EventPublisher interface {
+	Publish(ctx context.Context, event broker.Event) error
+}
 
 type Service struct {
 	txManager     repository.TxManager
 	comments      repository.CommentRepository
 	subscriptions repository.SubscriptionRepository
+	publisher     EventPublisher
 }
 
-func New(txManager repository.TxManager, comments repository.CommentRepository, subscriptions repository.SubscriptionRepository) *Service {
+func New(
+	txManager repository.TxManager,
+	comments repository.CommentRepository,
+	subscriptions repository.SubscriptionRepository,
+	publisher EventPublisher,
+) *Service {
 	return &Service{
 		txManager:     txManager,
 		comments:      comments,
 		subscriptions: subscriptions,
+		publisher:     publisher,
 	}
 }
 
@@ -37,20 +49,27 @@ func (s *Service) MakeComment(ctx context.Context, credentials *authctx.UserCred
 		return domain.Comment{}, err
 	}
 
+	var parent *domain.Comment
 	if cmd.ParentID != nil {
-		parent, err := s.comments.GetComment(ctx, domain.GetCommentQuery{CommentID: *cmd.ParentID})
+		parentComment, err := s.comments.GetComment(ctx, domain.GetCommentQuery{CommentID: *cmd.ParentID})
 		if err != nil {
 			return domain.Comment{}, err
 		}
-		if parent.PageID != cmd.PageID {
+		if parentComment.PageID != cmd.PageID {
 			return domain.Comment{}, apperrors.ErrInvalidInput
 		}
+		parentCopy := parentComment
+		parent = &parentCopy
 	}
 
 	err = s.txManager.WithTx(ctx, func(ctx context.Context, tx repository.PgxTx) error {
 		return s.comments.CreateComment(ctx, tx, comment)
 	})
 	if err != nil {
+		return domain.Comment{}, err
+	}
+
+	if err := s.publishCommentEvents(ctx, comment, parent); err != nil {
 		return domain.Comment{}, err
 	}
 
@@ -133,4 +152,45 @@ func (s *Service) UnsubscribeFromComments(ctx context.Context, credentials *auth
 	return s.txManager.WithTx(ctx, func(ctx context.Context, tx repository.PgxTx) error {
 		return s.subscriptions.UpsertSubscription(ctx, tx, existing)
 	})
+}
+
+func (s *Service) publishCommentEvents(ctx context.Context, comment domain.Comment, parent *domain.Comment) error {
+	if s.publisher == nil {
+		return nil
+	}
+
+	if parent != nil {
+		if parent.UserID == comment.UserID {
+			return nil
+		}
+		return s.publisher.Publish(ctx, broker.Event{
+			UserID:   parent.UserID.String(),
+			ActorID:  comment.UserID.String(),
+			EntityID: comment.ID.String(),
+			PageID:   comment.PageID.String(),
+			Type:     broker.EventCommentReply,
+		})
+	}
+
+	subs, err := s.subscriptions.ListActiveSubscriptionsByPage(ctx, comment.PageID.String())
+	if err != nil {
+		return err
+	}
+
+	for _, sub := range subs {
+		if sub.UserID == comment.UserID {
+			continue
+		}
+		if err := s.publisher.Publish(ctx, broker.Event{
+			UserID:   sub.UserID.String(),
+			ActorID:  comment.UserID.String(),
+			EntityID: comment.ID.String(),
+			PageID:   comment.PageID.String(),
+			Type:     broker.EventCommentThread,
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

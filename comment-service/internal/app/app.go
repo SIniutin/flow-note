@@ -11,6 +11,7 @@ import (
 	"github.com/flow-note/comment-service/internal/repository"
 	commentservice "github.com/flow-note/comment-service/internal/service"
 	"github.com/flow-note/common/authsecurity"
+	"github.com/flow-note/common/broker"
 	"github.com/flow-note/common/grpcauth"
 	commonpg "github.com/flow-note/common/postgres"
 	commonruntime "github.com/flow-note/common/runtime"
@@ -23,6 +24,7 @@ type App struct {
 	Config   config.Config
 	Logger   *zap.Logger
 	db       *commonpg.DB
+	rmq      *broker.RabbitMQ
 	server   *grpc.Server
 	listener net.Listener
 }
@@ -44,9 +46,17 @@ func New(cfg config.Config) (*App, error) {
 	db.SetupPostgres(dbPool.Pool, logger)
 
 	commentsRepo := repository.NewPostgres(dbPool)
-	commentsService := commentservice.New(dbPool, commentsRepo, commentsRepo)
+	rmq, err := broker.NewRabbitMQ(cfg.BrokerURL, cfg.BrokerExchange)
+	if err != nil {
+		dbPool.Close()
+		_ = lis.Close()
+		return nil, err
+	}
+
+	commentsService := commentservice.New(dbPool, commentsRepo, commentsRepo, rmq)
 	key, err := authsecurity.LoadRSAPublicKeyFromPEMFile(cfg.JWTPublicKeyPEM)
 	if err != nil {
+		_ = rmq.Close()
 		dbPool.Close()
 		_ = lis.Close()
 		return nil, err
@@ -65,6 +75,7 @@ func New(cfg config.Config) (*App, error) {
 		Config:   cfg,
 		Logger:   logger,
 		db:       dbPool,
+		rmq:      rmq,
 		server:   srv,
 		listener: lis,
 	}, nil
@@ -79,6 +90,9 @@ func (a *App) GracefulStop() {
 }
 
 func (a *App) Close() {
+	if a.rmq != nil {
+		_ = a.rmq.Close()
+	}
 	if a.db != nil {
 		a.db.Close()
 	}

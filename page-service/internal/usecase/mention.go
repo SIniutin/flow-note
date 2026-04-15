@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/broker"
 	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -22,6 +23,16 @@ func (s *Service) ReplacePageMentions(ctx context.Context, pageID uuid.UUID, men
 		return err
 	}
 
+	for _, m := range mentions {
+		if err := s.rabbit.Publish(ctx, broker.Event{
+			UserID:  m.UserID.String(),
+			ActorID: "",
+			PageID:  pageID.String(),
+			Type:    broker.EventMentionPage,
+		}); err != nil {
+			s.logger.Warn("EventMentionPage publish failed", zap.Error(err))
+		}
+	}
 	return nil
 }
 

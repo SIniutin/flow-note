@@ -23,7 +23,6 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-// App wires together all components and manages their lifecycle.
 type App struct {
 	Config   config.Config
 	Logger   *zap.Logger
@@ -66,7 +65,29 @@ func New(cfg config.Config) (*App, error) {
 	markAllRead := usecase.NewMarkAllRead(repo)
 	processEvent := usecase.NewProcessEvent(repo, rt)
 
-	amqpConsumer := consumer.New(rmq, cfg.BrokerQueue, processEvent)
+	q, err := rmq.DeclareQueueAndBind(cfg.BrokerQueue,
+		broker.EventMentionComment,
+		broker.EventMentionPage,
+		broker.EventCommentThread,
+		broker.EventCommentReply,
+		broker.EventCommentMention,
+	)
+	if err != nil {
+		_ = rt.Close()
+		_ = rmq.Close()
+		db.Close()
+		return nil, err
+	}
+
+	msgs, err := rmq.Consume(q.Name)
+	if err != nil {
+		_ = rt.Close()
+		_ = rmq.Close()
+		db.Close()
+		return nil, err
+	}
+
+	amqpConsumer := consumer.New(msgs, processEvent)
 
 	unaryInterceptors := []grpc.UnaryServerInterceptor{cr.RecoveryUnaryServerInterceptor(logger)}
 	streamInterceptors := []grpc.StreamServerInterceptor{cr.RecoveryStreamServerInterceptor(logger)}

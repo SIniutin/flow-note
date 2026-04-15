@@ -7,6 +7,9 @@ import (
 
 	"github.com/flow-note/comment-service/internal/domain"
 	"github.com/flow-note/common/apperrors"
+	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/broker"
+	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -82,14 +85,49 @@ func (f *fakeSubscriptions) GetSubscription(_ context.Context, userID, pageID st
 	return item, nil
 }
 
+func (f *fakeSubscriptions) ListActiveSubscriptionsByPage(_ context.Context, pageID string) ([]domain.CommentSubscription, error) {
+	out := make([]domain.CommentSubscription, 0)
+	for _, item := range f.items {
+		if item.PageID.String() == pageID && item.Status == domain.SubscriptionStatusActive {
+			out = append(out, item)
+		}
+	}
+	return out, nil
+}
+
+type fakePublisher struct {
+	items []broker.Event
+}
+
+func (f *fakePublisher) Publish(_ context.Context, event broker.Event) error {
+	f.items = append(f.items, event)
+	return nil
+}
+
 func TestMakeCommentStoresComment(t *testing.T) {
 	repo := newFakeComments()
 	subs := newFakeSubscriptions()
-	svc := New(fakeTxManager{}, repo, subs)
+	pub := &fakePublisher{}
+	svc := New(fakeTxManager{}, repo, subs, pub)
 
-	comment, err := svc.MakeComment(context.Background(), domain.CreateCommentCommand{
-		UserID: uuid.New(),
-		PageID: uuid.New(),
+	actorID := uuid.New()
+	pageID := uuid.New()
+	watcherID := uuid.New()
+	subs.items[watcherID.String()+":"+pageID.String()] = domain.CommentSubscription{
+		ID:        uuid.New(),
+		UserID:    watcherID,
+		PageID:    pageID,
+		Status:    domain.SubscriptionStatusActive,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+
+	comment, err := svc.MakeComment(context.Background(), &authctx.UserCredentials{
+		UserId: actorID,
+		Role:   perm.RoleCommenter,
+	}, domain.CreateCommentCommand{
+		UserID: actorID,
+		PageID: pageID,
 		Body:   "hello",
 	})
 	if err != nil {
@@ -103,12 +141,21 @@ func TestMakeCommentStoresComment(t *testing.T) {
 	if stored.Body != "hello" {
 		t.Fatalf("expected body hello, got %q", stored.Body)
 	}
+	if len(pub.items) != 1 {
+		t.Fatalf("expected 1 published event, got %d", len(pub.items))
+	}
+	if pub.items[0].Type != broker.EventCommentThread {
+		t.Fatalf("expected event type %q, got %q", broker.EventCommentThread, pub.items[0].Type)
+	}
+	if pub.items[0].UserID != watcherID.String() {
+		t.Fatalf("expected recipient %s, got %s", watcherID, pub.items[0].UserID)
+	}
 }
 
 func TestMakeCommentRejectsCrossPageParent(t *testing.T) {
 	repo := newFakeComments()
 	subs := newFakeSubscriptions()
-	svc := New(fakeTxManager{}, repo, subs)
+	svc := New(fakeTxManager{}, repo, subs, nil)
 
 	parent := domain.Comment{
 		ID:        uuid.New(),
@@ -121,7 +168,10 @@ func TestMakeCommentRejectsCrossPageParent(t *testing.T) {
 	}
 	repo.items[parent.ID] = parent
 
-	_, err := svc.MakeComment(context.Background(), domain.CreateCommentCommand{
+	_, err := svc.MakeComment(context.Background(), &authctx.UserCredentials{
+		UserId: uuid.New(),
+		Role:   perm.RoleCommenter,
+	}, domain.CreateCommentCommand{
 		UserID:   uuid.New(),
 		PageID:   uuid.New(),
 		ParentID: &parent.ID,
@@ -132,10 +182,54 @@ func TestMakeCommentRejectsCrossPageParent(t *testing.T) {
 	}
 }
 
+func TestReplyPublishesEventToParentAuthor(t *testing.T) {
+	repo := newFakeComments()
+	subs := newFakeSubscriptions()
+	pub := &fakePublisher{}
+	svc := New(fakeTxManager{}, repo, subs, pub)
+
+	parentAuthor := uuid.New()
+	pageID := uuid.New()
+	parent := domain.Comment{
+		ID:        uuid.New(),
+		UserID:    parentAuthor,
+		PageID:    pageID,
+		Body:      "root",
+		Status:    domain.CommentStatusActive,
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	}
+	repo.items[parent.ID] = parent
+
+	replyAuthor := uuid.New()
+	_, err := svc.MakeComment(context.Background(), &authctx.UserCredentials{
+		UserId: replyAuthor,
+		Role:   perm.RoleCommenter,
+	}, domain.CreateCommentCommand{
+		UserID:   replyAuthor,
+		PageID:   pageID,
+		ParentID: &parent.ID,
+		Body:     "reply",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(pub.items) != 1 {
+		t.Fatalf("expected 1 published event, got %d", len(pub.items))
+	}
+	if pub.items[0].Type != broker.EventCommentReply {
+		t.Fatalf("expected event type %q, got %q", broker.EventCommentReply, pub.items[0].Type)
+	}
+	if pub.items[0].UserID != parentAuthor.String() {
+		t.Fatalf("expected recipient %s, got %s", parentAuthor, pub.items[0].UserID)
+	}
+}
+
 func TestDeleteCommentSoftDeletesOwnedComment(t *testing.T) {
 	repo := newFakeComments()
 	subs := newFakeSubscriptions()
-	svc := New(fakeTxManager{}, repo, subs)
+	svc := New(fakeTxManager{}, repo, subs, nil)
 
 	actorID := uuid.New()
 	comment := domain.Comment{
@@ -149,7 +243,10 @@ func TestDeleteCommentSoftDeletesOwnedComment(t *testing.T) {
 	}
 	repo.items[comment.ID] = comment
 
-	if err := svc.DeleteComment(context.Background(), actorID, comment.ID); err != nil {
+	if err := svc.DeleteComment(context.Background(), &authctx.UserCredentials{
+		UserId: actorID,
+		Role:   perm.RoleCommenter,
+	}, actorID, comment.ID); err != nil {
 		t.Fatal(err)
 	}
 
@@ -161,12 +258,15 @@ func TestDeleteCommentSoftDeletesOwnedComment(t *testing.T) {
 func TestSubscribeAndUnsubscribePersistState(t *testing.T) {
 	repo := newFakeComments()
 	subs := newFakeSubscriptions()
-	svc := New(fakeTxManager{}, repo, subs)
+	svc := New(fakeTxManager{}, repo, subs, nil)
 
 	userID := uuid.New()
 	pageID := uuid.New()
 
-	if err := svc.SubscribeToComments(context.Background(), domain.SubscribeToCommentsCommand{
+	if err := svc.SubscribeToComments(context.Background(), &authctx.UserCredentials{
+		UserId: userID,
+		Role:   perm.RoleViewer,
+	}, domain.SubscribeToCommentsCommand{
 		UserID: userID,
 		PageID: pageID,
 	}); err != nil {
@@ -178,7 +278,10 @@ func TestSubscribeAndUnsubscribePersistState(t *testing.T) {
 		t.Fatalf("expected active subscription, got %s", item.Status)
 	}
 
-	if err := svc.UnsubscribeFromComments(context.Background(), domain.UnsubscribeFromCommentsCommand{
+	if err := svc.UnsubscribeFromComments(context.Background(), &authctx.UserCredentials{
+		UserId: userID,
+		Role:   perm.RoleViewer,
+	}, domain.UnsubscribeFromCommentsCommand{
 		UserID: userID,
 		PageID: pageID,
 	}); err != nil {

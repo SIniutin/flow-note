@@ -135,6 +135,30 @@ func (p *Postgres) GetSubscription(ctx context.Context, userID, pageID string) (
 	return scanSubscription(row)
 }
 
+func (p *Postgres) ListActiveSubscriptionsByPage(ctx context.Context, pageID string) ([]domain.CommentSubscription, error) {
+	rows, err := p.db.Pool.Query(ctx, `
+		SELECT id, user_id, page_id, status, created_at, updated_at
+		FROM comment_subscriptions
+		WHERE page_id = $1 AND status = 'active'
+		ORDER BY created_at ASC
+	`, pageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]domain.CommentSubscription, 0)
+	for rows.Next() {
+		item, err := scanSubscription(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}
+
 type scanner interface {
 	Scan(dest ...any) error
 }

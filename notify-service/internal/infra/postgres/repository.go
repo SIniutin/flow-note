@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Repository implements port.NotificationRepository against PostgreSQL.
 type Repository struct {
 	db *commonpg.DB
 }
@@ -19,9 +18,6 @@ func NewRepository(db *commonpg.DB) *Repository {
 	return &Repository{db: db}
 }
 
-// SaveEventNotifications persists the processed-event record and all notifications
-// in a single transaction. Returns (false, nil) when the event was already handled
-// (idempotency via ON CONFLICT DO NOTHING on processed_events).
 func (r *Repository) SaveEventNotifications(
 	ctx context.Context,
 	event domain.ProcessedEvent,
@@ -64,7 +60,6 @@ func (r *Repository) SaveEventNotifications(
 	return true, tx.Commit(ctx)
 }
 
-// ListByUser fetches notifications for a user, newest first.
 func (r *Repository) ListByUser(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -112,9 +107,6 @@ func (r *Repository) ListByUser(
 	return items, rows.Err()
 }
 
-// MarkRead sets read_at on a notification only if it belongs to userID.
-// Returns domain.ErrNotificationNotFound when the row doesn't exist or the user
-// doesn't own it.
 func (r *Repository) MarkRead(
 	ctx context.Context,
 	userID, notificationID uuid.UUID,
@@ -133,7 +125,6 @@ func (r *Repository) MarkRead(
 	return nil
 }
 
-// MarkAllRead sets read_at on every unread notification for a user.
 func (r *Repository) MarkAllRead(ctx context.Context, userID uuid.UUID, at time.Time) error {
 	_, err := r.db.Exec(ctx, `
 		UPDATE notifications SET read_at = $2

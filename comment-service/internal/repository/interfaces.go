@@ -24,4 +24,5 @@ type CommentRepository interface {
 type SubscriptionRepository interface {
 	UpsertSubscription(ctx context.Context, tx pgx.Tx, subscription domain.CommentSubscription) error
 	GetSubscription(ctx context.Context, userID, pageID string) (domain.CommentSubscription, error)
+	ListActiveSubscriptionsByPage(ctx context.Context, pageID string) ([]domain.CommentSubscription, error)
 }
