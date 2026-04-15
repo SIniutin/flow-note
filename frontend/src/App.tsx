@@ -66,6 +66,24 @@ export default function App() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Счётчик для принудительного обновления данных (роль, список страниц).
+    // Инкрементируется при возврате на вкладку — без перезагрузки страницы.
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    // Обновляем список страниц и роль при возврате на вкладку.
+    // Это позволяет гrantee увидеть новые доступные страницы и изменения роли
+    // без перезагрузки страницы.
+    useEffect(() => {
+        const handler = () => {
+            if (document.visibilityState === "visible") {
+                void pagesStore.loadFromBackend();
+                setRefreshKey(k => k + 1);
+            }
+        };
+        document.addEventListener("visibilitychange", handler);
+        return () => document.removeEventListener("visibilitychange", handler);
+    }, []);
+
     // При смене страницы: загружаем пользователей с доступом (для @ mention).
     useEffect(() => {
         if (!pageId) return;
@@ -120,7 +138,7 @@ export default function App() {
             .catch(() => { if (!cancelled) setMyRole("viewer"); });
 
         return () => { cancelled = true; };
-    }, [pageId, user?.id, currentPage?.ownerId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [pageId, user?.id, currentPage?.ownerId, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
     /** Может ли текущий пользователь редактировать содержимое. */
     const canEdit = ((): boolean => {

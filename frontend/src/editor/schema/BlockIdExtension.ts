@@ -1,12 +1,16 @@
 // ─── src/editor/schema/BlockIdExtension.ts ───────────────────────────────────
 // Добавляет атрибут block_id (стабильный UUID) всем блочным узлам.
-// По схеме: "all block nodes must have block_id" и "block_id must be stable
-// and unique within the document".
 //
-// Используем Extension.create с глобальным addGlobalAttributes — это
-// самый чистый способ добавить атрибут всем указанным типам узлов сразу.
+// Два механизма работают вместе:
+//   1. addGlobalAttributes — объявляет атрибут и читает его из HTML при parseHTML.
+//   2. appendTransaction   — после каждого изменения документа находит узлы с
+//      block_id === null и записывает свежий UUID прямо в ProseMirror state.
+//      Это гарантирует что Y.Doc всегда содержит UUID (y-prosemirror пропускает
+//      null-атрибуты при записи в Y.XmlElement, из-за чего meta-parser не видел
+//      блоки).
 
 import { Extension } from "@tiptap/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 // Узлы из схемы, которым нужен block_id
 const BLOCK_TYPES = [
@@ -23,14 +27,16 @@ const BLOCK_TYPES = [
     "tableOfContents",
 ] as const;
 
+const BLOCK_TYPE_SET = new Set<string>(BLOCK_TYPES);
+
 function generateBlockId(): string {
-    // crypto.randomUUID() — доступен во всех modern браузерах
     if (typeof crypto !== "undefined" && crypto.randomUUID) {
         return crypto.randomUUID();
     }
-    // Фоллбэк для старых сред
     return "b-" + Math.random().toString(36).slice(2, 11) + Date.now().toString(36);
 }
+
+const blockIdPluginKey = new PluginKey("blockIdAssign");
 
 export const BlockIdExtension = Extension.create({
     name: "blockId",
@@ -43,18 +49,47 @@ export const BlockIdExtension = Extension.create({
                 attributes: {
                     block_id: {
                         default: null,
-                        // Генерируем block_id если его нет при парсинге
+                        // При парсинге HTML: берём из атрибута или генерируем
                         parseHTML: el =>
                             el.getAttribute("data-block-id") ?? generateBlockId(),
-                        renderHTML: attrs => {
-                            // Если block_id не назначен — генерируем на лету
-                            const id = attrs.block_id ?? generateBlockId();
-                            return { "data-block-id": id };
-                        },
-                        keepOnSplit: false, // при Enter генерируем новый id
+                        renderHTML: attrs => ({
+                            "data-block-id": attrs.block_id ?? generateBlockId(),
+                        }),
+                        keepOnSplit: false, // при Enter потомок получает новый id через appendTransaction
                     },
                 },
             },
+        ];
+    },
+
+    addProseMirrorPlugins() {
+        return [
+            new Plugin({
+                key: blockIdPluginKey,
+
+                // Запускается после каждой транзакции. Если в документе
+                // появились узлы без block_id — назначаем UUID и возвращаем
+                // новую транзакцию. setMeta("addToHistory", false) не засоряет
+                // undo-стек.
+                appendTransaction(transactions, _oldState, newState) {
+                    if (!transactions.some(tr => tr.docChanged)) return null;
+
+                    const { tr } = newState;
+                    let modified = false;
+
+                    newState.doc.descendants((node, pos) => {
+                        if (BLOCK_TYPE_SET.has(node.type.name) && !node.attrs.block_id) {
+                            tr.setNodeMarkup(pos, undefined, {
+                                ...node.attrs,
+                                block_id: generateBlockId(),
+                            });
+                            modified = true;
+                        }
+                    });
+
+                    return modified ? tr.setMeta("addToHistory", false) : null;
+                },
+            }),
         ];
     },
 });
