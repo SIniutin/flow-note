@@ -2,7 +2,7 @@
 CREATE TABLE page_versions (
     id BIGSERIAL PRIMARY KEY,
     page_id UUID NOT NULL,
-    date VARCHAR(32) NULL,
+    date VARCHAR(128) NULL,
     size BIGINT NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT now(),
 
