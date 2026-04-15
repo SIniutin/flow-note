@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -45,7 +46,7 @@ func (s *Server) MakeComment(ctx context.Context, req *commentv1.CreateCommentRe
 			zap.String("method", "MakeComment"),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
 	cmd, err := toCreateCommentCommand(req, cred.UserId)
@@ -91,7 +92,7 @@ func (s *Server) SubscribeToComment(ctx context.Context, req *commentv1.Subscrib
 			zap.String("method", "SubscribeToComment"),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
 	cmd, err := toSubscribeCommand(cred.UserId, req.GetPageId())
@@ -135,7 +136,7 @@ func (s *Server) UnsubscribeToComment(ctx context.Context, req *commentv1.Unsubs
 			zap.String("method", "UnsubscribeToComment"),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
 	cmd, err := toUnsubscribeCommand(cred.UserId, req.GetPageId())
@@ -179,7 +180,7 @@ func (s *Server) ListComments(ctx context.Context, req *commentv1.ListCommentsRe
 			zap.String("method", "ListComments"),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
 	pageID, err := parseUUID(req.GetPageId(), "page_id")
@@ -230,7 +231,7 @@ func (s *Server) GetComment(ctx context.Context, req *commentv1.GetCommentReques
 			zap.String("method", "GetComment"),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, status.Error(codes.PermissionDenied, err.Error())
 	}
 
 	commentID, err := parseUUID(req.GetCommentId(), "comment_id")

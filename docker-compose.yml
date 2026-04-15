@@ -377,6 +377,11 @@ services:
       NOTIFY_BROKER_QUEUE: "notify-service.events"
       REDIS_ADDR: "redis:6379"
       LOG_LEVEL: "info"
+      JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
+      JWT_ISSUER: "flow-note-auth"
+      JWT_AUDIENCE: "flow-note-api"
+    secrets:
+      - jwt_public_key
     depends_on:
       postgres-notify:
         condition: service_healthy

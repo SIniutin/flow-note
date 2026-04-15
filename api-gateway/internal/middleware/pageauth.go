@@ -198,7 +198,11 @@ func extractPageID(r *http.Request) string {
 	if pageID := extractPageUUID(r.URL.Path); pageID != "" {
 		return pageID
 	}
+	// Accept both snake_case (page_id) and camelCase (pageId) — gRPC-gateway uses camelCase.
 	if pageID := r.URL.Query().Get("page_id"); pageID != "" {
+		return pageID
+	}
+	if pageID := r.URL.Query().Get("pageId"); pageID != "" {
 		return pageID
 	}
 	if r.Body == nil || (r.Method != http.MethodPost && r.Method != http.MethodPatch && r.Method != http.MethodPut) {
@@ -211,13 +215,18 @@ func extractPageID(r *http.Request) string {
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
 
+	// Accept both snake_case and camelCase JSON field names.
 	var payload struct {
-		PageID string `json:"page_id"`
+		PageIDSnake  string `json:"page_id"`
+		PageIDCamel  string `json:"pageId"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return ""
 	}
-	return payload.PageID
+	if payload.PageIDSnake != "" {
+		return payload.PageIDSnake
+	}
+	return payload.PageIDCamel
 }
 
 func extractPageUUID(path string) string {
