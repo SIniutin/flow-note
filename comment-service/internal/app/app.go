@@ -10,6 +10,7 @@ import (
 	grpcHandler "github.com/flow-note/comment-service/internal/handler/grpc"
 	"github.com/flow-note/comment-service/internal/repository"
 	commentservice "github.com/flow-note/comment-service/internal/service"
+	"github.com/flow-note/common/authctx"
 	"github.com/flow-note/common/authsecurity"
 	"github.com/flow-note/common/broker"
 	"github.com/flow-note/common/grpcauth"
@@ -17,6 +18,7 @@ import (
 	commonruntime "github.com/flow-note/common/runtime"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -67,6 +69,7 @@ func New(cfg config.Config) (*App, error) {
 		grpc.ChainUnaryInterceptor(
 			commonruntime.RecoveryUnaryServerInterceptor(logger),
 			grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{}),
+			roleFromGatewayInterceptor(),
 		),
 	)
 	commentv1.RegisterCommentServiceServer(srv, grpcHandler.New(commentsService, logger))
@@ -79,6 +82,26 @@ func New(cfg config.Config) (*App, error) {
 		server:   srv,
 		listener: lis,
 	}, nil
+}
+
+// roleFromGatewayInterceptor reads the x-user-role gRPC metadata header that
+// api-gateway sets (from its per-page Redis permission cache) and patches the
+// authctx so that ParseUserIDAndPermissionRole succeeds without a JWT role claim.
+func roleFromGatewayInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return handler(ctx, req)
+		}
+		vals := md.Get("x-user-role")
+		if len(vals) == 0 || vals[0] == "" {
+			return handler(ctx, req)
+		}
+		if info, ok := authctx.AuthInfoFromContext(ctx); ok {
+			ctx = authctx.WithAuthInfo(ctx, authctx.AuthInfo{UserID: info.UserID, Role: vals[0]})
+		}
+		return handler(ctx, req)
+	}
 }
 
 func (a *App) Serve() error {

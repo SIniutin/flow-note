@@ -5,6 +5,7 @@ import (
 	"net"
 
 	notificationsv1 "github.com/flow-note/api-contracts/generated/proto/notify/v1"
+	"github.com/flow-note/common/authctx"
 	"github.com/flow-note/common/authsecurity"
 	"github.com/flow-note/common/broker"
 	"github.com/flow-note/common/grpcauth"
@@ -20,6 +21,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -102,6 +104,7 @@ func New(cfg config.Config) (*App, error) {
 			streamInterceptors = append(streamInterceptors, grpcauth.StreamAuthInterceptor(verifier, map[string]struct{}{}))
 		}
 	}
+	unaryInterceptors = append(unaryInterceptors, roleFromGatewayInterceptor())
 
 	srv := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(unaryInterceptors...),
@@ -131,6 +134,26 @@ func New(cfg config.Config) (*App, error) {
 		listener: lis,
 		consumer: amqpConsumer,
 	}, nil
+}
+
+// roleFromGatewayInterceptor reads the x-user-role gRPC metadata header that
+// api-gateway sets (from its per-page Redis permission cache) and patches the
+// authctx so that ParseUserIDAndPermissionRole succeeds without a JWT role claim.
+func roleFromGatewayInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return handler(ctx, req)
+		}
+		vals := md.Get("x-user-role")
+		if len(vals) == 0 || vals[0] == "" {
+			return handler(ctx, req)
+		}
+		if info, ok := authctx.AuthInfoFromContext(ctx); ok {
+			ctx = authctx.WithAuthInfo(ctx, authctx.AuthInfo{UserID: info.UserID, Role: vals[0]})
+		}
+		return handler(ctx, req)
+	}
 }
 
 func (a *App) Serve() error {

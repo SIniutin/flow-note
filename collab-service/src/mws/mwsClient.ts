@@ -41,6 +41,10 @@ export interface TableViewInfo {
   type: string;
 }
 
+function mwsAuthToken(): string {
+  return config.mwsTableApiKey;
+}
+
 /**
  * Загружает ВСЕ записи датасета из MWS с пагинацией.
  * Каждый запрос имеет таймаут MWS_TIMEOUT_MS (AbortSignal.timeout).
@@ -69,7 +73,7 @@ export async function getRecords(
     try {
       res = await fetch(url, {
         signal:  AbortSignal.timeout(config.mwsTimeoutMs),
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${mwsAuthToken()}` },
       });
     } catch (err) {
       throw new MwsUnavailableError(dstId, err);
@@ -97,7 +101,7 @@ export async function getViews(dstId: string, token: string): Promise<TableViewI
   try {
     res = await fetch(`${config.mwsApiBase}/datasheets/${dstId}/views`, {
       signal: AbortSignal.timeout(config.mwsTimeoutMs),
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${mwsAuthToken()}` },
     });
   } catch (err) {
     throw new MwsUnavailableError(dstId, err);
@@ -131,7 +135,7 @@ export async function patchRecord(
       method:  "PATCH",
       signal:  AbortSignal.timeout(config.mwsTimeoutMs),
       headers: {
-        Authorization:  `Bearer ${token}`,
+        Authorization:  `Bearer ${mwsAuthToken()}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

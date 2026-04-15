@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 type GRPCConfig struct {
@@ -30,6 +31,7 @@ type JWTConfig struct {
 	Issuer        string
 	Audience      string
 	PublicKeyPath string
+	Whitelist     []string
 }
 
 type RabbitConfig struct {
@@ -65,6 +67,15 @@ func Default() Config {
 		Rabbit: RabbitConfig{
 			Url:      "amqp://guest:guest@localhost:5672/",
 			Exchange: "pages",
+		},
+		JWT: JWTConfig{
+			Whitelist: []string{
+				"/pages.v1.PagesService/UpdatePage",
+				"/pages.v1.PagesService/ReplacePageLinks",
+				"/pages.v1.PagesService/ReplacePageMentions",
+				"/pages.v1.PagesService/ReplacePageTables",
+				"/pages.v1.PagesService/ReplacePageMedia",
+			},
 		},
 	}
 }
@@ -105,6 +116,9 @@ func MustLoad() Config {
 	if value, ok := os.LookupEnv("JWT_PUBLIC_KEY_PEM"); ok {
 		cfg.JWT.PublicKeyPath = value
 	}
+	if value, ok := os.LookupEnv("JWT_WHITELIST"); ok {
+		cfg.JWT.Whitelist = splitCSV(value)
+	}
 
 	if value, ok := os.LookupEnv("RABBIT_URL"); ok {
 		cfg.Rabbit.Url = value
@@ -119,4 +133,21 @@ func MustLoad() Config {
 	}
 
 	return cfg
+}
+
+func splitCSV(value string) []string {
+	if value == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+
+	return out
 }

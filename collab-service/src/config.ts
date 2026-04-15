@@ -35,6 +35,7 @@ export const config = {
 
   // ── MWS Tables API ────────────────────────────────────────────────────────
   mwsApiBase:     str("MWS_API_BASE",    "http://mws-api/fusion/v1"),
+  mwsTableApiKey: str("MWS_TABLE_API_KEY", ""),
   mwsTimeoutMs:   int("MWS_TIMEOUT_MS",  8_000),
   mwsPageSize:    int("MWS_PAGE_SIZE",   100),
   /** Idle-таймаут кеша таблицы без обращений → eviction, мс */

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	mediav1 "github.com/flow-note/api-contracts/generated/proto/media/v1"
+	"github.com/flow-note/common/authctx"
 	"github.com/flow-note/common/authsecurity"
 	"github.com/flow-note/common/grpcauth"
 	"github.com/flow-note/media-service/config"
@@ -21,6 +22,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -107,9 +109,12 @@ func (a *App) Run(ctx context.Context) error {
 	verifier := authsecurity.NewRS256Verifier(key, a.cfg.JWT.Issuer, a.cfg.JWT.Audience)
 
 	a.grpcServer = grpc.NewServer(
-		grpc.ChainUnaryInterceptor(grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{
-			// TODO: make from config
-		})),
+		grpc.ChainUnaryInterceptor(
+			grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{
+				// TODO: make from config
+			}),
+			roleFromGatewayInterceptor(),
+		),
 	)
 
 	mediav1.RegisterMediaServiceServer(a.grpcServer, h)
@@ -222,6 +227,26 @@ func (a *App) httpHandler(gatewayMux *runtime.ServeMux) http.Handler {
 		ww := &statusWriter{ResponseWriter: w, statusCode: http.StatusOK}
 		mux.ServeHTTP(ww, r)
 	})
+}
+
+// roleFromGatewayInterceptor reads the x-user-role gRPC metadata header that
+// api-gateway sets (from its per-page Redis permission cache) and patches the
+// authctx so that ParseUserIDAndPermissionRole succeeds without a JWT role claim.
+func roleFromGatewayInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return handler(ctx, req)
+		}
+		vals := md.Get("x-user-role")
+		if len(vals) == 0 || vals[0] == "" {
+			return handler(ctx, req)
+		}
+		if info, ok := authctx.AuthInfoFromContext(ctx); ok {
+			ctx = authctx.WithAuthInfo(ctx, authctx.AuthInfo{UserID: info.UserID, Role: vals[0]})
+		}
+		return handler(ctx, req)
+	}
 }
 
 func (a *App) unaryLoggingInterceptor(

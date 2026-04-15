@@ -138,6 +138,7 @@ services:
       REDIS_URL: "redis://redis:6379"
       INSTANCE_ADDR: "collab-service:4000"
       MWS_API_BASE: "http://mock-tables:8080/fusion/v1"
+      MWS_TABLE_API_KEY: "uskbgAgZSgMCfLEEH6XqSZN"
       S3_ENDPOINT: "http://minio:9000"
       S3_BUCKET: "snapshots"
       S3_ACCESS_KEY: "minioadmin"

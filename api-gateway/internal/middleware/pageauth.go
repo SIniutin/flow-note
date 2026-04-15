@@ -24,6 +24,16 @@ import (
 
 const permCacheTTL = 5 * time.Minute
 
+// protoRoleToAuthRole converts gRPC proto enum strings to the short role names
+// that authctx.ParseUserIDAndPermissionRole expects (e.g. "owner", "editor").
+var protoRoleToAuthRole = map[string]string{
+	"PAGE_PERMISSION_ROLE_VIEWER":    "viewer",
+	"PAGE_PERMISSION_ROLE_COMMENTER": "commenter",
+	"PAGE_PERMISSION_ROLE_EDITOR":    "editor",
+	"PAGE_PERMISSION_ROLE_MENTOR":    "mentor",
+	"PAGE_PERMISSION_ROLE_OWNER":     "owner",
+}
+
 // Lua script for atomic page-level invalidation.
 // KEYS[1] — pattern  (e.g. "perm:<pageId>:*")
 // Uses KEYS (not SCAN) intentionally: single-node Redis only.
@@ -170,7 +180,11 @@ func (pc *PagePermCache) getPermission(ctx context.Context, pageID, userID, toke
 		return "", err
 	}
 
-	role := resp.GetPermission().GetRole().String()
+	protoRole := resp.GetPermission().GetRole().String()
+	role := protoRoleToAuthRole[protoRole] // convert to short form: "owner", "editor", …
+	if role == "" {
+		role = protoRole // fallback: keep original if unknown
+	}
 	if err := pc.rdb.Set(ctx, key, role, permCacheTTL).Err(); err != nil {
 		pc.logger.Warn("redis SET failed", zap.Error(err))
 	}
