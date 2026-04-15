@@ -1,6 +1,10 @@
 package broker
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -17,9 +21,11 @@ const (
 )
 
 type Event struct {
-	entity_id string    `json:entity_id`
-	page_id   string    `json:page_id`
-	Type      EventType `json:type`
+	UserID   string    `json:"user_id"`
+	ActorID  string    `json:"actor_id,omitempty"`
+	EntityID string    `json:"entity_id,omitempty"`
+	PageID   string    `json:"page_id"`
+	Type     EventType `json:"type"`
 }
 
 type RabbitMQ struct {
@@ -61,4 +67,64 @@ func (r *RabbitMQ) Close() error {
 		return r.conn.Close()
 	}
 	return nil
+}
+
+func (r *RabbitMQ) Publish(ctx context.Context, event Event) error {
+	body, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("marshal event: %w", err)
+	}
+
+	return r.ch.PublishWithContext(
+		ctx,
+		r.exchange,
+		string(event.Type),
+		false,
+		false,
+		amqp.Publishing{
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			Body:         body,
+		},
+	)
+}
+
+func (r *RabbitMQ) DeclareQueueAndBind(queueName string, events ...EventType) (amqp.Queue, error) {
+	q, err := r.ch.QueueDeclare(
+		queueName,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return amqp.Queue{}, err
+	}
+
+	for _, event := range events {
+		if err := r.ch.QueueBind(
+			q.Name,
+			string(event),
+			r.exchange,
+			false,
+			nil,
+		); err != nil {
+			return amqp.Queue{}, err
+		}
+	}
+
+	return q, nil
+}
+
+func (r *RabbitMQ) Consume(queueName string) (<-chan amqp.Delivery, error) {
+	return r.ch.Consume(
+		queueName,
+		"",
+		false,
+		false,
+		false,
+		false,
+		nil,
+	)
 }
