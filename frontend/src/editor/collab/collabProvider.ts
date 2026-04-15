@@ -103,20 +103,27 @@ export function setPageMeta(key: "title" | "description", value: string): void {
 /**
  * React-хук: подписывается на Y.Map("meta") текущего ydoc.
  * Перезапускается при смене pageId (ydoc уже заменён через connectCollab).
+ *
+ * Хранит pageId вместе с данными, чтобы при навигации не отдавать устаревший
+ * заголовок предыдущей страницы — иначе App.tsx успевал бы вызвать
+ * pagesStore.updateTitle(newPageId, oldTitle) до того, как ydoc синхронизируется.
  */
 export function usePageMeta(pageId: string): PageMeta {
-    const [state, setState] = useState<PageMeta>(() => {
-        const m: Y.Map<string> = ydoc.getMap("meta");
-        return { title: m.get("title") ?? null, description: m.get("description") ?? null };
-    });
+    const [stateData, setStateData] = useState<{ pageId: string; meta: PageMeta }>(() => ({
+        pageId,
+        meta: { title: null, description: null },
+    }));
 
     useEffect(() => {
         // При смене страницы connectCollab уже заменил ydoc — читаем свежую карту.
         const readMeta = () => {
             const m = ydoc.getMap("meta") as Y.Map<string>;
-            setState({
-                title:       m.get("title")       ?? null,
-                description: m.get("description") ?? null,
+            setStateData({
+                pageId,
+                meta: {
+                    title:       m.get("title")       ?? null,
+                    description: m.get("description") ?? null,
+                },
             });
         };
         readMeta();
@@ -127,5 +134,8 @@ export function usePageMeta(pageId: string): PageMeta {
         return () => doc.off("update", readMeta);
     }, [pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return state;
+    // Если данные принадлежат другому pageId (навигация только что произошла,
+    // эффект ещё не обновил состояние) — возвращаем null, чтобы не «заразить»
+    // другую страницу устаревшим заголовком.
+    return stateData.pageId === pageId ? stateData.meta : { title: null, description: null };
 }

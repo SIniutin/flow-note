@@ -4,14 +4,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { pagesClient } from "../api/pagesClient";
+import { authClient, type AuthUser } from "../api/authClient";
+import { getAccessToken } from "../data/authStore";
 import { Modal } from "./ui/surfaces";
 import { PAGE_PERMISSION_ROLES, PAGE_PERMISSION_ROLE_LABELS } from "../types/pages";
 import type { PagePermission, PagePermissionRole } from "../types/pages";
 import "./pageMenu.css";
-
-// ── UUID guard ────────────────────────────────────────────────────────────────
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isUUID = (s: string) => UUID_RE.test(s);
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -61,42 +59,77 @@ function IconClose() {
 
 // ── Permissions Modal ─────────────────────────────────────────────────────────
 
+interface MemberInfo {
+    perm: PagePermission;
+    user: AuthUser | null;
+}
+
 function PermissionsModal({ pageId, onClose }: { pageId: string; onClose: () => void }) {
-    const [perms, setPerms]         = useState<PagePermission[]>([]);
-    const [loading, setLoading]     = useState(true);
-    const [error, setError]         = useState<string | null>(null);
-    const [newUserId, setNewUserId] = useState("");
-    const [newRole, setNewRole]     = useState<PagePermissionRole>("viewer");
-    const [adding, setAdding]       = useState(false);
+    const [members, setMembers]       = useState<MemberInfo[]>([]);
+    const [loading, setLoading]       = useState(true);
+    const [error, setError]           = useState<string | null>(null);
+
+    // Поиск пользователя по логину
+    const [login, setLogin]           = useState("");
+    const [foundUser, setFoundUser]   = useState<AuthUser | null>(null);
+    const [searching, setSearching]   = useState(false);
+    const [searchErr, setSearchErr]   = useState<string | null>(null);
+    const [newRole, setNewRole]       = useState<PagePermissionRole>("viewer");
+    const [adding, setAdding]         = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     const load = () => {
-        if (!isUUID(pageId)) {
-            setError("Права доступа доступны только для сохранённых страниц");
-            setLoading(false);
-            return;
-        }
         setLoading(true);
         pagesClient.listPermissions(pageId)
-            .then(setPerms)
+            .then(async perms => {
+                const token = getAccessToken() ?? undefined;
+                const rows = await Promise.all(
+                    perms.map(async (p): Promise<MemberInfo> => {
+                        try {
+                            const { user } = await authClient.getById(p.user_id, token);
+                            return { perm: p, user };
+                        } catch {
+                            return { perm: p, user: null };
+                        }
+                    })
+                );
+                setMembers(rows);
+            })
             .catch(() => setError("Не удалось загрузить права"))
             .finally(() => setLoading(false));
     };
 
-    useEffect(() => { load(); }, [pageId]);
+    useEffect(() => { load(); }, [pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Автофокус на поле ввода
     useEffect(() => {
         const t = setTimeout(() => inputRef.current?.focus(), 60);
         return () => clearTimeout(t);
     }, []);
 
-    const handleGrant = async () => {
-        if (!newUserId.trim()) return;
-        setAdding(true);
+    const handleSearch = async () => {
+        if (!login.trim()) return;
+        setSearching(true);
+        setSearchErr(null);
+        setFoundUser(null);
         try {
-            await pagesClient.grantPermission(pageId, newUserId.trim(), newRole);
-            setNewUserId("");
+            const token = getAccessToken() ?? undefined;
+            const { user } = await authClient.getByName(login.trim(), token);
+            setFoundUser(user);
+        } catch {
+            setSearchErr("Пользователь не найден");
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    const handleGrant = async () => {
+        if (!foundUser) return;
+        setAdding(true);
+        setError(null);
+        try {
+            await pagesClient.grantPermission(pageId, foundUser.id, newRole);
+            setFoundUser(null);
+            setLogin("");
             load();
         } catch {
             setError("Ошибка при добавлении пользователя");
@@ -114,50 +147,71 @@ function PermissionsModal({ pageId, onClose }: { pageId: string; onClose: () => 
     };
 
     return createPortal(
-        <Modal open onClose={onClose} title="Доступ к странице" width={400}>
-            {error && <div className="perm-modal__error">{error}</div>}
+        <Modal open onClose={onClose} title="Доступ к странице" width={420}>
+            {error && <div className="perm-modal__error" onClick={() => setError(null)}>{error}</div>}
 
-            {/* Добавить пользователя */}
+            {/* Поиск пользователя по логину */}
             <div className="perm-modal__add">
-                <input
-                    ref={inputRef}
-                    className="perm-modal__input"
-                    placeholder="ID пользователя…"
-                    value={newUserId}
-                    onChange={e => setNewUserId(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") handleGrant(); }}
-                />
-                <select
-                    className="perm-modal__select"
-                    value={newRole}
-                    onChange={e => setNewRole(e.target.value as PagePermissionRole)}
-                >
-                    {PAGE_PERMISSION_ROLES.filter(r => r !== "owner").map(r => (
-                        <option key={r} value={r}>{PAGE_PERMISSION_ROLE_LABELS[r]}</option>
-                    ))}
-                </select>
-                <button
-                    className="perm-modal__invite-btn"
-                    disabled={!newUserId.trim() || adding}
-                    onClick={handleGrant}
-                >
-                    {adding ? "…" : "Добавить"}
-                </button>
+                <div className="perm-modal__search-row">
+                    <input
+                        ref={inputRef}
+                        className="perm-modal__input"
+                        placeholder="Логин пользователя…"
+                        value={login}
+                        onChange={e => { setLogin(e.target.value); setFoundUser(null); setSearchErr(null); }}
+                        onKeyDown={e => { if (e.key === "Enter") void handleSearch(); }}
+                    />
+                    <button
+                        className="perm-modal__search-btn"
+                        disabled={searching || !login.trim()}
+                        onClick={() => void handleSearch()}
+                    >
+                        {searching ? "…" : "Найти"}
+                    </button>
+                </div>
+
+                {searchErr && <div className="perm-modal__search-err">{searchErr}</div>}
+
+                {foundUser && (
+                    <div className="perm-modal__found">
+                        <div className="perm-modal__found-info">
+                            <span className="perm-modal__found-name">{foundUser.login}</span>
+                            <span className="perm-modal__found-email">{foundUser.email}</span>
+                        </div>
+                        <select
+                            className="perm-modal__select"
+                            value={newRole}
+                            onChange={e => setNewRole(e.target.value as PagePermissionRole)}
+                        >
+                            {PAGE_PERMISSION_ROLES.filter(r => r !== "owner").map(r => (
+                                <option key={r} value={r}>{PAGE_PERMISSION_ROLE_LABELS[r]}</option>
+                            ))}
+                        </select>
+                        <button
+                            className="perm-modal__invite-btn"
+                            disabled={adding}
+                            onClick={() => void handleGrant()}
+                        >
+                            {adding ? "…" : "Добавить"}
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Список участников */}
             <div className="perm-modal__list">
                 {loading && <div className="perm-modal__hint">Загрузка…</div>}
-                {!loading && perms.length === 0 && !error && (
+                {!loading && members.length === 0 && !error && (
                     <div className="perm-modal__hint">Нет других участников</div>
                 )}
-                {perms.map(p => (
+                {members.map(({ perm: p, user }) => (
                     <div key={p.user_id} className="perm-modal__row">
                         <div className="perm-modal__avatar">
-                            {p.user_id.slice(0, 2).toUpperCase()}
+                            {(user?.login ?? p.user_id).slice(0, 2).toUpperCase()}
                         </div>
                         <div className="perm-modal__user">
-                            <span className="perm-modal__uid">{p.user_id}</span>
+                            <span className="perm-modal__uid">{user?.login ?? p.user_id}</span>
+                            {user?.email && <span className="perm-modal__email">{user.email}</span>}
                         </div>
                         <select
                             className="perm-modal__select perm-modal__select--inline"
@@ -173,7 +227,7 @@ function PermissionsModal({ pageId, onClose }: { pageId: string; onClose: () => 
                             <button
                                 className="perm-modal__revoke"
                                 title="Отозвать доступ"
-                                onClick={() => handleRevoke(p.user_id)}
+                                onClick={() => void handleRevoke(p.user_id)}
                             >
                                 <IconClose/>
                             </button>
