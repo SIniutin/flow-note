@@ -9,10 +9,12 @@ replace github.com/flow-note/api-contracts => ../api-contracts
 require (
 	github.com/flow-note/api-contracts v0.0.0-00010101000000-000000000000
 	github.com/flow-note/common v0.0.0-00010101000000-000000000000
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/pressly/goose/v3 v3.27.0
 	go.uber.org/zap v1.27.1
+	golang.org/x/crypto v0.50.0
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
 )

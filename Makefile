@@ -2,7 +2,7 @@ SECRETS_DIR := secrets
 PRIVATE_KEY  := $(SECRETS_DIR)/jwt_private_key.pem
 PUBLIC_KEY   := $(SECRETS_DIR)/jwt_public_key.pem
 
-.PHONY: up down restart logs keys frontend dev auth-clear node-deps
+.PHONY: up down restart logs keys frontend dev auth-clear node-deps db-reset
 
 ## Generate JWT keys if missing
 keys:
@@ -47,6 +47,10 @@ logs:
 ## Clear auth tables in PostgreSQL
 auth-clear:
 	docker compose exec -T postgres psql -U postgres -d auth -c "TRUNCATE TABLE users CASCADE;"
+
+## Drop all app tables and migration history in every Postgres database
+db-reset:
+	sh ./scripts/reset-databases.sh
 
 ## Install frontend deps
 frontend:

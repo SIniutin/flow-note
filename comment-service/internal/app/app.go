@@ -10,6 +10,8 @@ import (
 	grpcHandler "github.com/flow-note/comment-service/internal/handler/grpc"
 	"github.com/flow-note/comment-service/internal/repository"
 	commentservice "github.com/flow-note/comment-service/internal/service"
+	"github.com/flow-note/common/authsecurity"
+	"github.com/flow-note/common/grpcauth"
 	commonpg "github.com/flow-note/common/postgres"
 	commonruntime "github.com/flow-note/common/runtime"
 	"go.uber.org/zap"
@@ -43,7 +45,20 @@ func New(cfg config.Config) (*App, error) {
 
 	commentsRepo := repository.NewPostgres(dbPool)
 	commentsService := commentservice.New(dbPool, commentsRepo, commentsRepo)
-	srv := grpc.NewServer()
+	key, err := authsecurity.LoadRSAPublicKeyFromPEMFile(cfg.JWTPublicKeyPEM)
+	if err != nil {
+		dbPool.Close()
+		_ = lis.Close()
+		return nil, err
+	}
+	verifier := authsecurity.NewRS256Verifier(key, cfg.JWTIssuer, cfg.JWTAudience)
+
+	srv := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(
+			commonruntime.RecoveryUnaryServerInterceptor(logger),
+			grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{}),
+		),
+	)
 	commentv1.RegisterCommentServiceServer(srv, grpcHandler.New(commentsService, logger))
 	reflection.Register(srv)
 	return &App{

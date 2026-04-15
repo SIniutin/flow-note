@@ -11,6 +11,9 @@ type Config struct {
 	BrokerURL      string
 	BrokerExchange string
 	LogLevel       string
+	JWTPublicKeyPEM string
+	JWTIssuer       string
+	JWTAudience     string
 }
 
 func Load() Config {
@@ -21,6 +24,9 @@ func Load() Config {
 		BrokerURL:      env("BROKER_URL", "amqp://guest:guest@localhost:5672/"),
 		BrokerExchange: env("BROKER_EXCHANGE", "flow.events"),
 		LogLevel:       env("LOG_LEVEL", "info"),
+		JWTPublicKeyPEM: env("JWT_PUBLIC_KEY_PEM", ""),
+		JWTIssuer:       env("JWT_ISSUER", "flow-note-auth"),
+		JWTAudience:     env("JWT_AUDIENCE", "flow-note-api"),
 	}
 }
 
