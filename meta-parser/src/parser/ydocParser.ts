@@ -99,7 +99,15 @@ function walkFragment(node: Y.XmlFragment | Y.XmlElement, col: TextCollector, cu
 
   for (const child of children) {
     if (child instanceof Y.XmlText) {
-      col.addText(child.toString());
+      // child.toString() wraps text in XML-like tags for each Yjs format attribute
+      // (e.g. "commentMark--hash", "bold"), producing "<commentMark--abc>Hello</commentMark--abc>"
+      // instead of "Hello". Use toDelta() to extract plain text inserts only.
+      const delta = (child.toDelta() as Array<{ insert?: unknown }>);
+      const plainText = delta
+        .filter(d => typeof d.insert === "string")
+        .map(d => d.insert as string)
+        .join("");
+      col.addText(plainText);
       continue;
     }
 

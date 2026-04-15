@@ -39,6 +39,13 @@ import {PageGraph} from "./components/PageGraph";
 
 import "./components/sidebar.css";
 
+/** Deterministic 1-4 color index from a thread ID so avatar colors never shift. */
+function stableColorIndex(id: string): 1 | 2 | 3 | 4 {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    return ((h % 4) + 1) as 1 | 2 | 3 | 4;
+}
+
 export default function App() {
     const [loading, setLoading] = useState(true);
     const [imgOpen, setImgOpen] = useState(false);
@@ -383,10 +390,10 @@ export default function App() {
                         Выделите текст и нажмите 💬 чтобы оставить комментарий.
                     </div>
                 )}
-                {visibleThreads.map((t, i) => (
+                {visibleThreads.map((t) => (
                     <ThreadCard
                         key={t.id} thread={t}
-                        colorIndex={((i % 4) + 1) as 1|2|3|4}
+                        colorIndex={stableColorIndex(t.id)}
                         active={activeThreadId === t.id}
                         onSelect={() => handleThreadSelect(t.id)}
                         onDelete={() => handleDeleteThread(t.id)}

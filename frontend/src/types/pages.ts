@@ -35,11 +35,11 @@ export const PAGE_PERMISSION_ROLE_LABELS: Record<PagePermissionRole, string> = {
 // ── PagePermission ────────────────────────────────────────────────────────────
 
 export interface PagePermission {
-    id:         string;
-    page_id:    string;
-    user_id:    string;
-    role:       PagePermissionRole;
-    granted_by: string;
-    created_at: string;
-    updated_at: string;
+    id:        string;
+    pageId:    string;
+    userId:    string;
+    role:      PagePermissionRole;
+    grantedBy: string;
+    createdAt: string;
+    updatedAt: string;
 }

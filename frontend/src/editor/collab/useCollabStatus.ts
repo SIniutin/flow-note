@@ -1,10 +1,10 @@
 // ─── src/editor/collab/useCollabStatus.ts ─────────────────────────────────────
 // Хук: статус подключения и список активных пользователей из awareness.
-// Импортируем provider как объект — при reconnect live binding обновится,
-// поэтому в каждом эффекте читаем provider.awareness, а не кэшируем.
+// Использует useSyncExternalStore. getSnapshot ОБЯЗАН возвращать кэшированный
+// объект (===), иначе React уходит в бесконечный цикл ре-рендеров.
 
-import { useEffect, useState } from "react";
-import { awareness, providerEpoch } from "./collabProvider";
+import { useSyncExternalStore } from "react";
+import { awareness, subscribeCollabStatus } from "./collabProvider";
 
 export interface CollabUser {
     clientId: number;
@@ -13,15 +13,19 @@ export interface CollabUser {
 }
 
 export interface CollabStatus {
-    /** Другие пользователи в документе (без себя) */
     peers: CollabUser[];
-    /** Общее число клиентов включая себя */
     totalClients: number;
 }
 
-function getStatus(): CollabStatus {
+const EMPTY_STATUS: CollabStatus = { peers: [], totalClients: 0 };
+
+// Кэш последнего снапшота — возвращаем тот же объект пока данные не изменились.
+let _cachedStatus: CollabStatus = EMPTY_STATUS;
+
+function computeStatus(): CollabStatus {
     const aw = awareness;
-    if (!aw) return { peers: [], totalClients: 0 };
+    if (!aw) return EMPTY_STATUS;
+
     const states = aw.getStates();
     const myId   = aw.clientID;
 
@@ -34,22 +38,25 @@ function getStatus(): CollabStatus {
         }
     });
 
-    return { peers, totalClients: states.size };
+    // Сравниваем с кэшем по значению, чтобы не создавать новый объект зря.
+    const total = states.size;
+    if (
+        _cachedStatus !== EMPTY_STATUS &&
+        _cachedStatus.totalClients === total &&
+        _cachedStatus.peers.length === peers.length &&
+        _cachedStatus.peers.every((p, i) =>
+            p.clientId === peers[i].clientId &&
+            p.name     === peers[i].name     &&
+            p.color    === peers[i].color
+        )
+    ) {
+        return _cachedStatus; // ← возвращаем тот же объект, React не ре-рендерит
+    }
+
+    _cachedStatus = { peers, totalClients: total };
+    return _cachedStatus;
 }
 
 export function useCollabStatus(): CollabStatus {
-    const [status, setStatus] = useState<CollabStatus>(getStatus);
-
-    useEffect(() => {
-        const update = () => setStatus(getStatus());
-        const aw = awareness;
-        if (!aw) {
-            setStatus(getStatus());
-            return;
-        }
-        aw.on("change", update);
-        return () => { aw.off("change", update); };
-    }, [providerEpoch]);
-
-    return status;
+    return useSyncExternalStore(subscribeCollabStatus, computeStatus, () => EMPTY_STATUS);
 }

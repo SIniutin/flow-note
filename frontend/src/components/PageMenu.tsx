@@ -86,7 +86,7 @@ function PermissionsModal({ pageId, onClose }: { pageId: string; onClose: () => 
                 const rows = await Promise.all(
                     perms.map(async (p): Promise<MemberInfo> => {
                         try {
-                            const { user } = await authClient.getById(p.user_id, token);
+                            const { user } = await authClient.getById(p.userId, token);
                             return { perm: p, user };
                         } catch {
                             return { perm: p, user: null };
@@ -205,18 +205,18 @@ function PermissionsModal({ pageId, onClose }: { pageId: string; onClose: () => 
                     <div className="perm-modal__hint">Нет других участников</div>
                 )}
                 {members.map(({ perm: p, user }) => (
-                    <div key={p.user_id} className="perm-modal__row">
+                    <div key={p.userId} className="perm-modal__row">
                         <div className="perm-modal__avatar">
-                            {(user?.login ?? p.user_id).slice(0, 2).toUpperCase()}
+                            {(user?.login ?? p.userId).slice(0, 2).toUpperCase()}
                         </div>
                         <div className="perm-modal__user">
-                            <span className="perm-modal__uid">{user?.login ?? p.user_id}</span>
+                            <span className="perm-modal__uid">{user?.login ?? p.userId}</span>
                             {user?.email && <span className="perm-modal__email">{user.email}</span>}
                         </div>
                         <select
                             className="perm-modal__select perm-modal__select--inline"
                             value={p.role}
-                            onChange={e => handleRoleChange(p.user_id, e.target.value as PagePermissionRole)}
+                            onChange={e => handleRoleChange(p.userId, e.target.value as PagePermissionRole)}
                             disabled={p.role === "owner"}
                         >
                             {PAGE_PERMISSION_ROLES.map(r => (
@@ -227,7 +227,7 @@ function PermissionsModal({ pageId, onClose }: { pageId: string; onClose: () => 
                             <button
                                 className="perm-modal__revoke"
                                 title="Отозвать доступ"
-                                onClick={() => void handleRevoke(p.user_id)}
+                                onClick={() => void handleRevoke(p.userId)}
                             >
                                 <IconClose/>
                             </button>

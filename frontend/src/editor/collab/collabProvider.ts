@@ -7,7 +7,7 @@
 // ES-модули используют live bindings: изменение export let ydoc / awareness
 // в connectCollab() сразу видно всем импортёрам при следующем обращении.
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"; // useEffect+useState нужны для usePageMeta ниже
 import * as Y from "yjs";
 import { HocuspocusProvider } from "@hocuspocus/provider";
 import { getAccessToken } from "../../data/authStore";
@@ -23,6 +23,28 @@ export let ydoc: Y.Doc = new Y.Doc();
 export let provider: HocuspocusProvider | null = null;
 export let awareness: HocuspocusProvider["awareness"] | null = null;
 export let providerEpoch = 0;
+
+// ── External store subscription (for useSyncExternalStore in useCollabStatus) ──
+// Listeners are notified on awareness changes and provider switches.
+// We manage subscription directly so we can detach BEFORE provider.destroy()
+// to avoid "setState during render" when connectCollab() runs in App's render body.
+
+const _statusListeners = new Set<() => void>();
+
+export function subscribeCollabStatus(listener: () => void): () => void {
+    _statusListeners.add(listener);
+    return () => _statusListeners.delete(listener);
+}
+
+function _notifyStatusListeners(): void {
+    _statusListeners.forEach(l => l());
+}
+
+function _detachAwareness(): void {
+    if (provider?.awareness) {
+        provider.awareness.off("change", _notifyStatusListeners);
+    }
+}
 
 function makeProvider(pageId: string, doc: Y.Doc): HocuspocusProvider {
     const p = new HocuspocusProvider({
@@ -44,6 +66,7 @@ function makeProvider(pageId: string, doc: Y.Doc): HocuspocusProvider {
             window.dispatchEvent(new CustomEvent("collab:synced"));
         },
     });
+    p.awareness.on("change", _notifyStatusListeners);
     return p;
 }
 
@@ -55,6 +78,7 @@ function setProvider(next: HocuspocusProvider | null): void {
     provider = next;
     awareness = next?.awareness ?? null;
     providerEpoch += 1;
+    _notifyStatusListeners();
 }
 
 // ── Page switch ───────────────────────────────────────────────────────────────
@@ -65,6 +89,7 @@ function setProvider(next: HocuspocusProvider | null): void {
  * иначе TipTap продолжит работать со старым ydoc.
  */
 export function connectCollab(pageId: string): void {
+    _detachAwareness(); // must happen BEFORE destroy to avoid setState-during-render
     provider?.destroy();
     ydoc.destroy();
 
@@ -81,6 +106,7 @@ export function connectCollab(pageId: string): void {
  * Используется после обновления JWT-токена — редактор ремонтировать не нужно.
  */
 export function reconnectPageProvider(pageId: string): void {
+    _detachAwareness();
     provider?.destroy();
     if (!hasAccessToken()) {
         setProvider(null);
@@ -94,6 +120,7 @@ export function reconnectPageProvider(pageId: string): void {
  * Вызывать при logout — чтобы убрать присутствие пользователя у других участников.
  */
 export function disconnectCollab(): void {
+    _detachAwareness();
     provider?.destroy();
     ydoc.destroy();
     ydoc = new Y.Doc();
