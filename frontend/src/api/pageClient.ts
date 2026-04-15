@@ -88,6 +88,10 @@ export const pageClient = {
         return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/permissions`);
     },
 
+    getMyPermission(pageId: string): Promise<{ permission: PagePermission }> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/permissions/me`);
+    },
+
     grantPermission(pageId: string, userId: string, role: PermissionRole): Promise<{ permission: PagePermission }> {
         return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/permissions`, {
             method: "POST",

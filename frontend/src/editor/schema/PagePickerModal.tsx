@@ -10,8 +10,10 @@ import "./pagePicker.css";
 
 let _resolver: ((page: WikiPage | null) => void) | null = null;
 let _anchorRect: DOMRect | null = null;
+let _currentPageId = "";
 
-export function openPagePicker(anchorRect?: DOMRect): Promise<WikiPage | null> {
+export function openPagePicker(anchorRect?: DOMRect, currentPageId?: string): Promise<WikiPage | null> {
+    if (currentPageId !== undefined) _currentPageId = currentPageId;
     if (anchorRect) {
         _anchorRect = anchorRect;
     } else {
@@ -116,7 +118,8 @@ export function PagePickerModal() {
     }
 
     const filtered = pages.filter(p =>
-        !search || p.title.toLowerCase().includes(search.toLowerCase()),
+        p.id !== _currentPageId &&
+        (!search || p.title.toLowerCase().includes(search.toLowerCase())),
     );
 
     const handleKey = (e: React.KeyboardEvent) => {

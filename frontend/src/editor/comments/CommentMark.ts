@@ -46,7 +46,15 @@ export const CommentMark = Mark.create<CommentMarkOptions>({
     },
     addCommands() {
         return {
-            setCommentMark: (threadId) => ({ commands }) => commands.setMark(this.name, { threadId }),
+            setCommentMark: (threadId) => ({ tr, dispatch, state }) => {
+                if (!dispatch) return false;
+                const { from, to } = state.selection;
+                const type = state.schema.marks[this.name];
+                tr.addMark(from, to, type.create({ threadId }));
+                tr.setMeta("addToHistory", false);
+                dispatch(tr);
+                return true;
+            },
             unsetCommentMark: (threadId) => ({ tr, dispatch, state }) => {
                 if (!dispatch) return false;
                 const { doc } = state;
@@ -58,6 +66,8 @@ export const CommentMark = Mark.create<CommentMarkOptions>({
                         }
                     });
                 });
+                tr.setMeta("addToHistory", false);
+                dispatch(tr);
                 return true;
             },
         };

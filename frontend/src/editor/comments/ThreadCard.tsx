@@ -15,8 +15,8 @@ interface Props {
     onDelete: () => void;
 }
 
-export const ThreadCard = memo(function ThreadCard({thread, colorIndex, active, onSelect, onDelete}: Props) {
-    const {addReply, resolveThread, removeReply} = useComments();
+export const ThreadCard = memo(function ThreadCard({thread, colorIndex, active, onSelect}: Props) {
+    const {addReply, resolveThread} = useComments();
     const currentUser = useCurrentUser();
     const [replyText, setReplyText] = useState("");
 
@@ -29,18 +29,10 @@ export const ThreadCard = memo(function ThreadCard({thread, colorIndex, active, 
     const resolveAuthorName = (authorId: string | undefined, fallback: string): string =>
         getUserById(authorId)?.name ?? fallback;
 
-    const canDeleteThread = !thread.authorId || thread.authorId === currentUser.id;
-
     const actionLinkStyle: React.CSSProperties = {
         cursor: "pointer",
         fontSize: "var(--fs-xs)",
         color: "var(--accent)",
-    };
-    const dangerLinkStyle: React.CSSProperties = {
-        cursor: "pointer",
-        fontSize: "var(--fs-xs)",
-        color: "var(--text-tertiary)",
-        marginLeft: 12,
     };
 
     return (
@@ -48,7 +40,6 @@ export const ThreadCard = memo(function ThreadCard({thread, colorIndex, active, 
             onClick={onSelect}
             style={{
                 cursor: "pointer",
-                // box-shadow вместо outline — не обрезается overflow:hidden родителя
                 boxShadow: active ? "0 0 0 2px var(--accent)" : "none",
                 borderRadius: "var(--radius-sm)",
                 marginBottom: 8,
@@ -61,32 +52,16 @@ export const ThreadCard = memo(function ThreadCard({thread, colorIndex, active, 
                 resolved={thread.resolved}
                 colorIndex={colorIndex}
             >
-                {thread.replies.map(r => {
-                    const canDeleteReply = !r.authorId || r.authorId === currentUser.id;
-                    return (
-                        <div key={r.id}>
-                            <Comment
-                                author={resolveAuthorName(r.authorId, r.author)}
-                                date={r.createdAt}
-                                text={r.text}
-                                colorIndex={colorIndex}
-                            />
-                            {canDeleteReply && (
-                                <div style={{paddingLeft: 36, marginTop: -4, marginBottom: 4}}>
-                                    <span
-                                        style={dangerLinkStyle}
-                                        onClick={e => {
-                                            e.stopPropagation();
-                                            removeReply(thread.id, r.id);
-                                        }}
-                                    >
-                                        Удалить
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
+                {thread.replies.map(r => (
+                    <div key={r.id}>
+                        <Comment
+                            author={resolveAuthorName(r.authorId, r.author)}
+                            date={r.createdAt}
+                            text={r.text}
+                            colorIndex={colorIndex}
+                        />
+                    </div>
+                ))}
             </Comment>
 
             {!thread.resolved && (
@@ -106,8 +81,8 @@ export const ThreadCard = memo(function ThreadCard({thread, colorIndex, active, 
                 </div>
             )}
 
-            <div style={{paddingLeft: 12, marginBottom: 8}}>
-                {!thread.resolved && (
+            {!thread.resolved && (
+                <div style={{paddingLeft: 12, marginBottom: 8}}>
                     <span
                         style={actionLinkStyle}
                         onClick={e => {
@@ -117,19 +92,8 @@ export const ThreadCard = memo(function ThreadCard({thread, colorIndex, active, 
                     >
                         Отметить решённым
                     </span>
-                )}
-                {canDeleteThread && (
-                    <span
-                        style={dangerLinkStyle}
-                        onClick={e => {
-                            e.stopPropagation();
-                            if (confirm("Удалить комментарий и все ответы?")) onDelete();
-                        }}
-                    >
-                        Удалить
-                    </span>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 });

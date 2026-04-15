@@ -118,7 +118,7 @@ export function VersionHistory({ pageId, onClose, onPreview }: VersionHistoryPro
                     </button>
                 </div>
                 <p className="vh__subtitle">
-                    Автосохранение каждые несколько минут. Нажмите 👁 чтобы просмотреть версию.
+                    Снимки сохраняются автоматически. Каждая версия — это состояние документа на момент снимка. Нажмите 👁 чтобы просмотреть.
                 </p>
             </div>
 

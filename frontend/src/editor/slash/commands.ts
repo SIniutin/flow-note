@@ -2,6 +2,7 @@ import type { Editor, Range } from "@tiptap/core";
 import { mwsTableCommand } from "../mwsTable/mwsTableCommand";
 import { emojiPickerStore } from "../emoji/emojiPickerStore";
 import { openPagePicker } from "../schema/PagePickerModal";
+import { pagesStore } from "../../data/pagesStore";
 
 export interface SlashCommand {
     title: string;
@@ -64,7 +65,7 @@ export const slashCommands: SlashCommand[] = [
             const anchorRect = new DOMRect(coords.left, coords.top, 0, lineH);
 
             editor.chain().focus().deleteRange(range).run();
-            openPagePicker(anchorRect).then(page => {
+            openPagePicker(anchorRect, pagesStore.getCurrentId()).then(page => {
                 if (!page) return;
                 editor.chain().focus().insertPageLink({
                     page_id: page.id,

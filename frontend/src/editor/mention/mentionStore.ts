@@ -17,6 +17,11 @@ const initial: MentionState = {
 let state: MentionState = initial;
 const listeners = new Set<() => void>();
 
+// Упоминания доступны только владельцу страницы.
+let _canMention = false;
+export function setCanMention(can: boolean): void { _canMention = can; }
+export function getCanMention(): boolean { return _canMention; }
+
 export const mentionStore = {
     get: () => state,
     set: (patch: Partial<MentionState>) => {

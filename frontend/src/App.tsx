@@ -34,7 +34,9 @@ import {VersionHistory} from "./editor/history/VersionHistory";
 import {VersionPreviewOverlay} from "./editor/history/VersionPreviewOverlay";
 import {useIncomingLinks} from "./data/pagelinksStore";
 import {PagePickerModal} from "./editor/schema/PagePickerModal";
+import {EditorContextMenu} from "./editor/ContextMenu";
 import {PageGraph} from "./components/PageGraph";
+
 import "./components/sidebar.css";
 
 export default function App() {
@@ -130,11 +132,10 @@ export default function App() {
         }
 
         let cancelled = false;
-        pageClient.listPermissions(pageId)
-            .then(({ permissions }) => {
+        pageClient.getMyPermission(pageId)
+            .then(({ permission }) => {
                 if (cancelled) return;
-                const mine = permissions.find(p => p.userId === user.id);
-                setMyRole(mine ? mine.role : "viewer");
+                setMyRole(permission.role);
             })
             .catch(() => { if (!cancelled) setMyRole("viewer"); });
 
@@ -357,7 +358,12 @@ export default function App() {
                 🗺 Граф
             </a>
             <a style={{cursor:"pointer", color:"var(--text-tertiary)"}}
-               onClick={() => { clearAll(pageId); window.location.reload(); }}>
+               onClick={() => {
+                   if (!window.confirm("Сбросить документ? Всё содержимое страницы будет удалено на сервере и восстановлению не подлежит.")) return;
+                   clearAll(pageId);
+                   editor?.commands.clearContent(false);
+                   setTimeout(() => window.location.reload(), 500);
+               }}>
                 Сбросить
             </a>
         </>
@@ -476,6 +482,7 @@ export default function App() {
             <MentionMenu/>
             <TablePickerModal/>
             <PagePickerModal/>
+            <EditorContextMenu editor={editor} onAddComment={handleAddComment}/>
             <CommentComposer editor={editor} open={composerOpen} onClose={() => setComposerOpen(false)}/>
             {previewDoc && (
                 <VersionPreviewOverlay

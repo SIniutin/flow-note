@@ -1,0 +1,60 @@
+/* ─── Editor Context Menu ───────────────────────────────────────────────────── */
+
+.ctx-menu {
+    position: fixed;
+    z-index: 900;
+    min-width: 210px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.12);
+    padding: 4px;
+    animation: ctx-appear 0.08s ease;
+    user-select: none;
+}
+
+@keyframes ctx-appear {
+    from { opacity: 0; transform: scale(0.95) translateY(-4px); }
+    to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.ctx-menu__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 20px;
+    padding: 6px 10px;
+    border: none;
+    border-radius: var(--radius-xs);
+    background: none;
+    color: var(--text-primary);
+    font-size: var(--fs-sm);
+    cursor: pointer;
+    text-align: left;
+    white-space: nowrap;
+    transition: background 0.08s;
+}
+
+.ctx-menu__item:hover:not(.ctx-menu__item--disabled) {
+    background: var(--bg-surface-muted);
+}
+
+.ctx-menu__item--disabled {
+    color: var(--text-tertiary);
+    cursor: default;
+    pointer-events: none;
+}
+
+.ctx-menu__shortcut {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-family: ui-monospace, Consolas, monospace;
+    letter-spacing: 0.02em;
+}
+
+.ctx-menu__divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 3px 6px;
+}

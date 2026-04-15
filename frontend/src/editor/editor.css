@@ -1,6 +1,7 @@
 .ProseMirror {
     outline: none;
-    min-height: 400px;
+    min-height: calc(100vh - 220px);
+    padding-bottom: 160px;
     font-size: var(--fs-md);
     color: var(--text-primary);
     text-align: left;
