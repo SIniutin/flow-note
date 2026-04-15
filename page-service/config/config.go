@@ -32,11 +32,17 @@ type JWTConfig struct {
 	PublicKeyPath string
 }
 
+type RabbitConfig struct {
+	Url      string
+	Exchange string
+}
+
 type Config struct {
-	GRPC GRPCConfig
-	HTTP HTTPConfig
-	DB   DBConfig
-	JWT  JWTConfig
+	GRPC   GRPCConfig
+	HTTP   HTTPConfig
+	DB     DBConfig
+	JWT    JWTConfig
+	Rabbit RabbitConfig
 }
 
 func Default() Config {
@@ -54,6 +60,10 @@ func Default() Config {
 			Password: "postgres",
 			Name:     "pages",
 			SSLMode:  "disable",
+		},
+		Rabbit: RabbitConfig{
+			Url:      "amqp://guest:guest@localhost:5672/",
+			Exchange: "pages",
 		},
 	}
 }
@@ -93,6 +103,14 @@ func MustLoad() Config {
 	}
 	if value, ok := os.LookupEnv("JWT_PUBLIC_KEY_PEM"); ok {
 		cfg.JWT.PublicKeyPath = value
+	}
+
+	if value, ok := os.LookupEnv("RABBIT_URL"); ok {
+		cfg.Rabbit.Url = value
+	}
+
+	if value, ok := os.LookupEnv("RABBIT_EXCHANGE"); ok {
+		cfg.Rabbit.Exchange = value
 	}
 
 	return cfg

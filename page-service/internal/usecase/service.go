@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/flow-note/common/authctx"
+	"github.com/flow-note/common/broker"
 	"github.com/flow-note/common/perm"
 	"github.com/flow-note/page-service/internal/repository"
 
@@ -65,6 +66,7 @@ type MediaUsecase interface {
 
 type Service struct {
 	logger         *zap.Logger
+	rabbit         *broker.RabbitMQ
 	pageRepo       repository.PageRepository
 	versionRepo    repository.VersionRepository
 	permissionRepo repository.PermissionRepository
@@ -76,6 +78,7 @@ type Service struct {
 
 func NewService(
 	logger *zap.Logger,
+	rabbit *broker.RabbitMQ,
 	pageRepo repository.PageRepository,
 	versionRepo repository.VersionRepository,
 	permissionRepo repository.PermissionRepository,
@@ -89,6 +92,7 @@ func NewService(
 	}
 	return &Service{
 		logger:         logger,
+		rabbit:         rabbit,
 		pageRepo:       pageRepo,
 		versionRepo:    versionRepo,
 		permissionRepo: permissionRepo,

@@ -80,12 +80,12 @@ func (s *Service) RevokePagePermission(ctx context.Context, credentials *authctx
 }
 
 func (s *Service) ListPagePermissions(ctx context.Context, credentials *authctx.UserCredentials, pageID uuid.UUID) ([]domain.Permission, error) {
-	if !perm.HasRequiredPermission(credentials.Role, perm.RoleMentor) {
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
 		s.logger.Warn("ListPagePermissions permission denied",
 			zap.String("page_id", pageID.String()),
 			zap.String("user_id", credentials.UserId.String()),
 			zap.String("role", string(credentials.Role)),
-			zap.Error(perm.ErrMentorPermissionRequired),
+			zap.Error(perm.ErrViewerPermissionRequired),
 		)
 		return nil, perm.ErrMentorPermissionRequired
 	}

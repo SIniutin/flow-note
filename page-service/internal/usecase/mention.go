@@ -12,8 +12,6 @@ import (
 )
 
 func (s *Service) ReplacePageMentions(ctx context.Context, pageID uuid.UUID, mentions []domain.PageMentionInput) error {
-	// TODO: to Notify
-
 	err := s.mentionRepo.ReplaceMentionByPageID(ctx, pageID, mentions)
 	if err != nil {
 		s.logger.Error("ReplacePageMentions repository error",

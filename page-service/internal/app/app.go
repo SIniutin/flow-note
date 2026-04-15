@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flow-note/common/authsecurity"
+	"github.com/flow-note/common/broker"
 	"github.com/flow-note/page-service/config"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -64,7 +65,13 @@ func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, erro
 	)
 
 	repo := repository.NewRepository(dbPool)
-	uc := usecase.NewService(logger, repo, repo, repo, repo, repo, repo, repo)
+	rabbit, err := broker.NewRabbitMQ(cfg.Rabbit.Url, cfg.Rabbit.Exchange)
+	if err != nil {
+		return nil, err
+	}
+	defer rabbit.Close()
+
+	uc := usecase.NewService(logger, rabbit, repo, repo, repo, repo, repo, repo, repo)
 
 	h := handler.NewPagesHandler(logger, uc, uc, uc, uc, uc, uc, uc)
 	pb.RegisterPagesServiceServer(grpcServer, h)
