@@ -1,11 +1,12 @@
 import { getAccessToken } from "../data/authStore";
 
 export interface BackendPage {
-    id:        string;
-    title:     string;
-    ownerId:   string;
-    createdAt: string;
-    updatedAt: string;
+    id:          string;
+    title:       string;
+    description?: string;
+    ownerId:     string;
+    createdAt:   string;
+    updatedAt:   string;
 }
 
 async function authFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -70,6 +71,13 @@ export const pageClient = {
 
     create(title: string): Promise<{ page: BackendPage }> {
         return authFetch("/v1/pages", { method: "POST", body: JSON.stringify({ title }) });
+    },
+
+    update(pageId: string, patch: { title?: string; description?: string }): Promise<{ page: BackendPage }> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}`, {
+            method: "PATCH",
+            body: JSON.stringify(patch),
+        });
     },
 
     delete(pageId: string): Promise<void> {

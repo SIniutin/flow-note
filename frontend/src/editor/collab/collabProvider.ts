@@ -37,6 +37,12 @@ function makeProvider(pageId: string, doc: Y.Doc): HocuspocusProvider {
             console.warn(`[collab] auth failed page=${pageId}:`, reason),
         onClose: ({ event }: { event: CloseEvent }) =>
             console.warn(`[collab] ws closed  page=${pageId}  code=${event.code}`),
+        // Сообщаем редактору, что сервер прислал свой стейт и можно проверять
+        // пустоту документа. Важно для предотвращения дублирования контента:
+        // не вставляем начальный контент пока не убедились что сервер реально пуст.
+        onSynced: () => {
+            window.dispatchEvent(new CustomEvent("collab:synced"));
+        },
     });
     return p;
 }
@@ -81,6 +87,17 @@ export function reconnectPageProvider(pageId: string): void {
         return;
     }
     setProvider(makeProvider(pageId, ydoc));
+}
+
+/**
+ * Полностью рвёт WebSocket-соединение и освобождает ydoc.
+ * Вызывать при logout — чтобы убрать присутствие пользователя у других участников.
+ */
+export function disconnectCollab(): void {
+    provider?.destroy();
+    ydoc.destroy();
+    ydoc = new Y.Doc();
+    setProvider(null);
 }
 
 export const ROOM_NAME = "wiki-editor-v1"; // kept for backward compat

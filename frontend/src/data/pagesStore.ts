@@ -63,10 +63,11 @@ export const pagesStore = {
         try {
             const { pages } = await pageClient.listAllowed();
             const mapped: WikiPage[] = pages.map(bp => ({
-                id:        bp.id,
-                title:     bp.title,
-                createdAt: bp.createdAt,
-                updatedAt: bp.updatedAt,
+                id:          bp.id,
+                title:       bp.title,
+                description: bp.description,
+                createdAt:   bp.createdAt,
+                updatedAt:   bp.updatedAt,
             }));
             setPages(mapped);
         } catch (err) {

@@ -26,6 +26,7 @@ import {Sidebar} from "./components/Sidebar";
 import {BacklinksPanel} from "./components/BacklinksPanel";
 import {SharePanel} from "./components/SharePanel";
 import {pagesStore, useCurrentPage} from "./data/pagesStore";
+import {pageClient} from "./api/pageClient";
 import {pageUsersStore} from "./data/pageUsersStore";
 import * as collabProvider from "./editor/collab/collabProvider";
 import { usePageMeta, setPageMeta } from "./editor/collab/collabProvider";
@@ -259,7 +260,12 @@ export default function App() {
                 {user?.login ?? user?.email ?? ""}
             </span>
             <a style={{cursor:"pointer",color:"var(--text-tertiary)",fontSize:"var(--fs-sm)"}}
-               onClick={() => void authLogout()}>
+               onClick={() => {
+                   // Рвём WebSocket-соединение ДО очистки токена —
+                   // иначе awareness остаётся у других участников.
+                   collabProvider.disconnectCollab();
+                   void authLogout();
+               }}>
                 Выйти
             </a>
 
@@ -361,11 +367,15 @@ export default function App() {
                             if (!currentPage) return;
                             setPageMeta("title", title);
                             pagesStore.updateTitle(currentPage.id, title);
+                            // Сохраняем в page-service чтобы новые участники
+                            // видели актуальный заголовок до загрузки collab-документа.
+                            pageClient.update(currentPage.id, { title }).catch(() => {});
                         }}
                         onDescriptionChange={desc => {
                             if (!currentPage) return;
                             setPageMeta("description", desc);
                             pagesStore.updateDescription(currentPage.id, desc);
+                            pageClient.update(currentPage.id, { description: desc }).catch(() => {});
                         }}
                     >
                         {loading

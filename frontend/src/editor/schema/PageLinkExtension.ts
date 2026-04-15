@@ -65,7 +65,10 @@ export const PageLinkExtension = Node.create<{ pageId: string; onNavigate?: (pag
         return [
             "a",
             mergeAttributes(
-                { "data-page-link": "", class: "page-link", href: "#" },
+                // Намеренно без href — браузер не откроет новую вкладку
+                // ни при левом клике, ни при Ctrl+click, ни при middle-click.
+                // Навигация обрабатывается в handleDOMEvents.click ниже.
+                { "data-page-link": "", class: "page-link" },
                 HTMLAttributes,
             ),
             `📄 ${label}`,
