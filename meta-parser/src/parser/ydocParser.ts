@@ -2,7 +2,8 @@
  * Парсит бинарный Y.Doc snapshot и извлекает метаданные страницы.
  *
  * Ожидаемая структура TipTap/hocuspocus:
- *   doc.get("content", Y.XmlFragment)
+ *   doc.getMap("meta")           → title, description
+ *   doc.get("default", Y.XmlFragment)
  *     → paragraph, heading(level), bulletList, orderedList, listItem,
  *       blockquote, codeBlock, mws_table(dst_id), ...
  */
@@ -37,10 +38,11 @@ export function parseSnapshot(blob: Uint8Array): PageMetadata {
   const doc = new Y.Doc();
   Y.applyUpdate(doc, blob);
 
-  // title хранится как отдельный Y.Text (doc-contract.yaml: document_model.title)
-  const titleFromDoc = doc.getText("title").toString().trim();
+  // title хранится в Y.Map("meta"), ключ "title" — так же как на фронтенде (collabProvider.ts)
+  const titleFromDoc = (doc.getMap("meta") as Y.Map<string>).get("title")?.trim() ?? "";
 
-  const root = doc.get("content", Y.XmlFragment);
+  // Контент хранится в XmlFragment("default") — имя по умолчанию TipTap/Hocuspocus
+  const root = doc.get("default", Y.XmlFragment);
   const collector = new TextCollector();
   walkFragment(root, collector);
 
