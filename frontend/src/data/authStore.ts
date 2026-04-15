@@ -61,6 +61,10 @@ function wipe() {
     localStorage.removeItem(LS_ACCESS);
     localStorage.removeItem(LS_REFRESH);
     localStorage.removeItem(LS_USER);
+    // Чистим кэш страниц — после логаута/сброса БД он не актуален.
+    // Без этого connectCollab успевает запустится со старым pageId ещё до редиректа.
+    localStorage.removeItem("wiki:pages:v2");
+    localStorage.removeItem("wiki:current-page:v2");
 }
 
 // ── Auto token refresh ────────────────────────────────────────────────────────
@@ -175,6 +179,13 @@ export function handleUnauthorized(): void {
 
 // Запускаем таймер сразу при загрузке, если токен уже есть в localStorage
 scheduleTokenRefresh();
+
+// Немедленно проверяем сессию через refresh-эндпоинт.
+// Refresh-токен хранится в БД — если БД сброшена, получим 401 → wipe() → редирект на auth.
+// В обычном случае просто обновляем пару токенов.
+if (_refreshToken && _accessToken && !DEV_BYPASS) {
+    void performRefresh();
+}
 
 // ── hook ──────────────────────────────────────────────────────────────────────
 
