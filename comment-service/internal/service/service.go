@@ -58,16 +58,16 @@ func (s *Service) MakeComment(ctx context.Context, credentials *authctx.UserCred
 }
 
 func (s *Service) GetComment(ctx context.Context, credentials *authctx.UserCredentials, commentID uuid.UUID) (domain.Comment, error) {
-	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
-		return domain.Comment{}, perm.ErrCommentPermissionRequired
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
+		return domain.Comment{}, perm.ErrViewerPermissionRequired
 	}
 
 	return s.comments.GetComment(ctx, domain.GetCommentQuery{CommentID: commentID})
 }
 
 func (s *Service) ListComments(ctx context.Context, credentials *authctx.UserCredentials, query domain.ListCommentsQuery) ([]domain.Comment, error) {
-	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
-		return []domain.Comment{}, perm.ErrCommentPermissionRequired
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
+		return []domain.Comment{}, perm.ErrViewerPermissionRequired
 	}
 
 	return s.comments.ListComments(ctx, query)
@@ -94,8 +94,8 @@ func (s *Service) DeleteComment(ctx context.Context, credentials *authctx.UserCr
 }
 
 func (s *Service) SubscribeToComments(ctx context.Context, credentials *authctx.UserCredentials, cmd domain.SubscribeToCommentsCommand) error {
-	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
-		return perm.ErrCommentPermissionRequired
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
+		return perm.ErrViewerPermissionRequired
 	}
 
 	subscription, err := domain.NewCommentSubscription(time.Now().UTC(), cmd)
@@ -117,8 +117,8 @@ func (s *Service) SubscribeToComments(ctx context.Context, credentials *authctx.
 }
 
 func (s *Service) UnsubscribeFromComments(ctx context.Context, credentials *authctx.UserCredentials, cmd domain.UnsubscribeFromCommentsCommand) error {
-	if !perm.HasRequiredPermission(credentials.Role, perm.RoleCommenter) {
-		return perm.ErrCommentPermissionRequired
+	if !perm.HasRequiredPermission(credentials.Role, perm.RoleViewer) {
+		return perm.ErrViewerPermissionRequired
 	}
 
 	existing, err := s.subscriptions.GetSubscription(ctx, cmd.UserID.String(), cmd.PageID.String())
