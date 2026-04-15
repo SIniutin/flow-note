@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/flow-note/comment-service/internal/domain"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -17,6 +18,7 @@ type PgxTx = pgx.Tx
 type CommentRepository interface {
 	CreateComment(ctx context.Context, tx pgx.Tx, comment domain.Comment) error
 	GetComment(ctx context.Context, query domain.GetCommentQuery) (domain.Comment, error)
+	GetRootCommentByPageIDAndBodyID(ctx context.Context, pageID uuid.UUID, bodyID string) (domain.Comment, error)
 	ListComments(ctx context.Context, query domain.ListCommentsQuery) ([]domain.Comment, error)
 	SoftDeleteComment(ctx context.Context, tx pgx.Tx, comment domain.Comment, at time.Time) error
 }

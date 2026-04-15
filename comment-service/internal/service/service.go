@@ -44,22 +44,29 @@ func (s *Service) MakeComment(ctx context.Context, credentials *authctx.UserCred
 		return domain.Comment{}, perm.ErrCommentPermissionRequired
 	}
 
-	comment, err := domain.NewComment(time.Now().UTC(), cmd)
-	if err != nil {
-		return domain.Comment{}, err
-	}
-
 	var parent *domain.Comment
-	if cmd.ParentID != nil {
-		parentComment, err := s.comments.GetComment(ctx, domain.GetCommentQuery{CommentID: *cmd.ParentID})
+	if cmd.ParentID != nil || cmd.ParentBodyID != nil {
+		var parentComment domain.Comment
+		var err error
+		if cmd.ParentID != nil {
+			parentComment, err = s.comments.GetComment(ctx, domain.GetCommentQuery{CommentID: *cmd.ParentID})
+		} else {
+			parentComment, err = s.comments.GetRootCommentByPageIDAndBodyID(ctx, cmd.PageID, *cmd.ParentBodyID)
+		}
 		if err != nil {
 			return domain.Comment{}, err
 		}
 		if parentComment.PageID != cmd.PageID {
 			return domain.Comment{}, apperrors.ErrInvalidInput
 		}
+		cmd.ParentID = &parentComment.ID
 		parentCopy := parentComment
 		parent = &parentCopy
+	}
+
+	comment, err := domain.NewComment(time.Now().UTC(), cmd)
+	if err != nil {
+		return domain.Comment{}, err
 	}
 
 	err = s.txManager.WithTx(ctx, func(ctx context.Context, tx repository.PgxTx) error {

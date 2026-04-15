@@ -37,6 +37,15 @@ func (f *fakeComments) GetComment(_ context.Context, query domain.GetCommentQuer
 	return f.items[query.CommentID], nil
 }
 
+func (f *fakeComments) GetRootCommentByPageIDAndBodyID(_ context.Context, pageID uuid.UUID, bodyID string) (domain.Comment, error) {
+	for _, item := range f.items {
+		if item.PageID == pageID && item.BodyID != nil && *item.BodyID == bodyID && item.ParentID == nil {
+			return item, nil
+		}
+	}
+	return domain.Comment{}, apperrors.ErrNotFound
+}
+
 func (f *fakeComments) ListComments(_ context.Context, query domain.ListCommentsQuery) ([]domain.Comment, error) {
 	out := make([]domain.Comment, 0)
 	for _, item := range f.items {

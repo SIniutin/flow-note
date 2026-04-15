@@ -36,7 +36,7 @@ type Comment struct {
 	UserID    uuid.UUID
 	ParentID  *uuid.UUID
 	PageID    uuid.UUID
-	BodyID    *uuid.UUID
+	BodyID    *string
 	Body      string
 	Status    CommentStatus
 	Deleted   bool
@@ -86,7 +86,7 @@ func (c Comment) Validate() error {
 		return ErrEmptyCommentBody
 	}
 
-	if c.BodyID != nil && *c.BodyID == uuid.Nil {
+	if c.BodyID != nil && strings.TrimSpace(*c.BodyID) == "" {
 		return ErrInvalidBodyID
 	}
 	if c.ParentID != nil && *c.ParentID == uuid.Nil {
@@ -173,11 +173,12 @@ func (s *CommentSubscription) Deactivate(now time.Time) {
 }
 
 type CreateCommentCommand struct {
-	UserID   uuid.UUID
-	ParentID *uuid.UUID
-	PageID   uuid.UUID
-	BodyID   *uuid.UUID
-	Body     string
+	UserID       uuid.UUID
+	ParentID     *uuid.UUID
+	ParentBodyID *string
+	PageID       uuid.UUID
+	BodyID       *string
+	Body         string
 }
 
 func (c CreateCommentCommand) Validate() error {
@@ -193,7 +194,10 @@ func (c CreateCommentCommand) Validate() error {
 	if c.ParentID != nil && *c.ParentID == uuid.Nil {
 		return ErrInvalidCommentID
 	}
-	if c.BodyID != nil && *c.BodyID == uuid.Nil {
+	if c.ParentBodyID != nil && strings.TrimSpace(*c.ParentBodyID) == "" {
+		return ErrInvalidCommentID
+	}
+	if c.BodyID != nil && strings.TrimSpace(*c.BodyID) == "" {
 		return ErrInvalidBodyID
 	}
 

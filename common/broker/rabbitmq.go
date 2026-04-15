@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -35,7 +36,7 @@ type RabbitMQ struct {
 }
 
 func NewRabbitMQ(url, exchange string) (*RabbitMQ, error) {
-	conn, err := amqp.Dial(url)
+	conn, err := dialWithRetry(url)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +58,23 @@ func NewRabbitMQ(url, exchange string) (*RabbitMQ, error) {
 		ch:       ch,
 		exchange: exchange,
 	}, nil
+}
+
+func dialWithRetry(url string) (*amqp.Connection, error) {
+	var err error
+	delay := 250 * time.Millisecond
+	for attempt := 0; attempt < 20; attempt++ {
+		var conn *amqp.Connection
+		conn, err = amqp.Dial(url)
+		if err == nil {
+			return conn, nil
+		}
+		time.Sleep(delay)
+		if delay < 2*time.Second {
+			delay *= 2
+		}
+	}
+	return nil, err
 }
 
 func (r *RabbitMQ) Close() error {

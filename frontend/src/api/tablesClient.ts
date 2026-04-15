@@ -25,6 +25,28 @@ interface TableMeta {
     columns:     MwsColumn[];
 }
 
+// ── Custom tables (localStorage) ──────────────────────────────────────────────
+
+const CUSTOM_TABLES_KEY = "mws_custom_tables_v1";
+
+function loadCustomTables(): TableMeta[] {
+    try {
+        const raw = localStorage.getItem(CUSTOM_TABLES_KEY);
+        if (!raw) return [];
+        return JSON.parse(raw) as TableMeta[];
+    } catch {
+        return [];
+    }
+}
+
+function saveCustomTables(list: TableMeta[]): void {
+    try {
+        localStorage.setItem(CUSTOM_TABLES_KEY, JSON.stringify(list));
+    } catch { /* ignore */ }
+}
+
+const customTables: TableMeta[] = loadCustomTables();
+
 // Catalog таблиц: id → meta. При интеграции с реальным MWS заменить на GET /datasheets.
 const CATALOG: TableMeta[] = [
     {
@@ -186,9 +208,9 @@ function cacheSet(table: MwsTable): void {
 // ── public API ────────────────────────────────────────────────────────────────
 
 export const tablesClient = {
-    /** Список всех таблиц без строк (из локального catalog) */
+    /** Список всех таблиц без строк (catalog + пользовательские) */
     async listTables(): Promise<Omit<MwsTable, "rows">[]> {
-        return CATALOG.map(({ id, name, description, icon, columns }) => ({
+        return [...CATALOG, ...customTables].map(({ id, name, description, icon, columns }) => ({
             id, name, description, icon, columns,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -200,7 +222,7 @@ export const tablesClient = {
         const cached = cacheGet(id);
         if (cached) return cached;
 
-        const meta = CATALOG.find(c => c.id === id);
+        const meta = CATALOG.find(c => c.id === id) ?? customTables.find(c => c.id === id);
         if (!meta) return null;
 
         let rows: MwsRow[];
@@ -236,10 +258,10 @@ export const tablesClient = {
         return table;
     },
 
-    /** Поиск по имени / описанию (catalog-side, без API) */
+    /** Поиск по имени / описанию (catalog + пользовательские) */
     async searchTables(query: string): Promise<Omit<MwsTable, "rows">[]> {
         const q = query.toLowerCase();
-        return CATALOG.filter(t =>
+        return [...CATALOG, ...customTables].filter(t =>
             t.name.toLowerCase().includes(q) ||
             (t.description ?? "").toLowerCase().includes(q),
         ).map(({ id, name, description, icon, columns }) => ({
@@ -247,6 +269,29 @@ export const tablesClient = {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         }));
+    },
+
+    /**
+     * Создаёт новую таблицу с указанными колонками.
+     * ID генерируется локально; mock-tables автоматически создаёт датасит при первом GET.
+     * Схема колонок сохраняется в localStorage для персистентности между сессиями.
+     */
+    async createTable(
+        name: string,
+        icon: string,
+        columns: MwsColumn[],
+        description = "",
+    ): Promise<Omit<MwsTable, "rows">> {
+        const id = `tbl_${Array.from(crypto.getRandomValues(new Uint8Array(8)))
+            .map(b => b.toString(16).padStart(2, "0")).join("")}`;
+        const meta: TableMeta = { id, name, description, icon, columns };
+        customTables.push(meta);
+        saveCustomTables(customTables);
+        return {
+            id, name, description, icon, columns,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
     },
 
     /** Сохранение строк таблицы через PATCH API */

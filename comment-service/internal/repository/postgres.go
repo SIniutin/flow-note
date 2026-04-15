@@ -9,6 +9,7 @@ import (
 	"github.com/flow-note/comment-service/internal/domain"
 	"github.com/flow-note/common/apperrors"
 	commonpg "github.com/flow-note/common/postgres"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -39,6 +40,17 @@ func (p *Postgres) GetComment(ctx context.Context, query domain.GetCommentQuery)
 		FROM comments
 		WHERE id = $1
 	`, query.CommentID)
+
+	return scanComment(row)
+}
+
+func (p *Postgres) GetRootCommentByPageIDAndBodyID(ctx context.Context, pageID uuid.UUID, bodyID string) (domain.Comment, error) {
+	row := p.db.QueryRow(ctx, `
+		SELECT id, user_id, parent_id, page_id, body_id, body, status, deleted, created_at, updated_at, deleted_at
+		FROM comments
+		WHERE page_id = $1 AND body_id = $2 AND parent_id IS NULL
+		LIMIT 1
+	`, pageID, bodyID)
 
 	return scanComment(row)
 }

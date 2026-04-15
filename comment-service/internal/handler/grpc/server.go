@@ -279,16 +279,15 @@ func toCreateCommentCommand(req *commentv1.CreateCommentRequest, userID uuid.UUI
 	if strings.TrimSpace(req.GetParentId()) != "" {
 		parentID, err := parseUUID(req.GetParentId(), "parent_id")
 		if err != nil {
-			return domain.CreateCommentCommand{}, err
+			parentBodyID := strings.TrimSpace(req.GetParentId())
+			cmd.ParentBodyID = &parentBodyID
+		} else {
+			cmd.ParentID = &parentID
 		}
-		cmd.ParentID = &parentID
 	}
 
 	if strings.TrimSpace(req.GetBodyId()) != "" {
-		bodyID, err := parseUUID(req.GetBodyId(), "body_id")
-		if err != nil {
-			return domain.CreateCommentCommand{}, err
-		}
+		bodyID := strings.TrimSpace(req.GetBodyId())
 		cmd.BodyID = &bodyID
 	}
 
@@ -341,7 +340,7 @@ func toProtoComment(comment domain.Comment) *commentv1.Comment {
 		msg.ParentId = comment.ParentID.String()
 	}
 	if comment.BodyID != nil {
-		msg.BodyId = comment.BodyID.String()
+		msg.BodyId = *comment.BodyID
 	}
 
 	return msg
