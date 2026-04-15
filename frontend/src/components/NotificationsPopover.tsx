@@ -44,14 +44,23 @@ export function NotificationsPopover() {
     // Загружаем при открытии
     useEffect(() => { if (open) load(); }, [open]);
 
-    // Периодически обновляем счётчик (раз в 30с)
+    // Периодически обновляем счётчик (раз в 60с).
+    // При 401 останавливаем поллинг — токен невалиден, handleUnauthorized сделает redirect.
     useEffect(() => {
         if (!getAccessToken()) return;
-        notifyClient.getNotifications({ pageSize: 50 }).then(res => setItems(res?.notifications ?? [])).catch(() => {});
-        const t = setInterval(() => {
-            notifyClient.getNotifications({ pageSize: 50 }).then(res => setItems(res?.notifications ?? [])).catch(() => {});
-        }, 30_000);
-        return () => clearInterval(t);
+        let stopped = false;
+        const fetch = () => {
+            if (stopped || !getAccessToken()) return;
+            notifyClient.getNotifications({ pageSize: 50 })
+                .then(res => { if (!stopped) setItems(res?.notifications ?? []); })
+                .catch(err => {
+                    const msg = String(err?.message ?? "");
+                    if (msg.includes("401") || msg.includes("403")) stopped = true;
+                });
+        };
+        fetch();
+        const t = setInterval(fetch, 60_000);
+        return () => { stopped = true; clearInterval(t); };
     }, []);
 
     // Закрытие при клике снаружи
