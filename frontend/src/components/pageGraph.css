@@ -1,0 +1,151 @@
+/* ─── PageGraph ─────────────────────────────────────────────────────────────── */
+
+.pg {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+/* Header */
+.pg__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.pg__head-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pg__title {
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-semibold);
+    color: var(--text-primary);
+}
+
+.pg__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 5px;
+    font-size: 11px;
+    font-weight: var(--fw-semibold);
+    color: var(--text-on-accent);
+    background: var(--accent);
+    border-radius: var(--radius-pill);
+}
+
+.pg__close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: none;
+    border: none;
+    border-radius: var(--radius-xs);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: color 0.1s, background 0.1s;
+}
+
+.pg__close-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-surface-muted);
+}
+
+/* Body */
+.pg__body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 8px;
+}
+
+/* Empty / loading / error states */
+.pg__state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-tertiary);
+    font-size: var(--fs-sm);
+    text-align: center;
+    padding: 24px;
+}
+
+.pg__state--err {
+    color: var(--danger);
+}
+
+.pg__kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 11px;
+    font-family: monospace;
+    background: var(--bg-surface-muted);
+    border: 1px solid var(--border-default);
+    border-radius: 3px;
+    color: var(--text-secondary);
+}
+
+/* SVG */
+.pg__svg {
+    width: 100%;
+    height: 100%;
+    max-height: 440px;
+    overflow: visible;
+}
+
+/* Edges */
+.pg__edge {
+    stroke: var(--border-strong);
+    stroke-width: 1.4;
+    fill: none;
+    transition: stroke 0.15s;
+}
+
+/* Nodes */
+.pg__node circle {
+    fill: var(--bg-surface);
+    stroke: var(--border-strong);
+    stroke-width: 1.8;
+    transition: fill 0.12s, stroke 0.12s;
+}
+
+.pg__node--current circle {
+    fill: var(--accent);
+    stroke: var(--accent);
+}
+
+.pg__node--hover circle {
+    fill: var(--accent-soft);
+    stroke: var(--accent);
+}
+
+/* Labels */
+.pg__label {
+    font-size: 10px;
+    fill: var(--text-primary);
+    pointer-events: none;
+    user-select: none;
+}
+
+.pg__node--current .pg__label {
+    fill: var(--text-on-accent);
+    font-size: 11px;
+    font-weight: 600;
+}

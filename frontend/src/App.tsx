@@ -34,13 +34,14 @@ import {VersionHistory} from "./editor/history/VersionHistory";
 import {VersionPreviewOverlay} from "./editor/history/VersionPreviewOverlay";
 import {useIncomingLinks} from "./data/pagelinksStore";
 import {PagePickerModal} from "./editor/schema/PagePickerModal";
+import {PageGraph} from "./components/PageGraph";
 import "./components/sidebar.css";
 
 export default function App() {
     const [loading, setLoading] = useState(true);
     const [imgOpen, setImgOpen] = useState(false);
     const [stickerOpen, setStickerOpen] = useState(false);
-    const [rightPanel, setRightPanel] = useState<"comments" | "history" | "backlinks" | "share" | null>("comments");
+    const [rightPanel, setRightPanel] = useState<"comments" | "history" | "backlinks" | "share" | "graph" | null>("comments");
     const [composerOpen, setComposerOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [previewDoc, setPreviewDoc] = useState<Y.Doc | null>(null);
@@ -351,6 +352,10 @@ export default function App() {
                onClick={() => setRightPanel(p => p === "share" ? null : "share")}>
                 👥 Доступ
             </a>
+            <a style={{cursor:"pointer", color: rightPanel==="graph" ? "var(--accent)" : undefined}}
+               onClick={() => setRightPanel(p => p === "graph" ? null : "graph")}>
+                🗺 Граф
+            </a>
             <a style={{cursor:"pointer", color:"var(--text-tertiary)"}}
                onClick={() => { clearAll(pageId); window.location.reload(); }}>
                 Сбросить
@@ -403,6 +408,14 @@ export default function App() {
         sidePanel = (
             <SharePanel
                 pageId={pageId}
+                onClose={() => setRightPanel(null)}
+            />
+        );
+    } else if (rightPanel === "graph") {
+        sidePanel = (
+            <PageGraph
+                pageId={pageId}
+                onNavigate={handleNavigate}
                 onClose={() => setRightPanel(null)}
             />
         );
