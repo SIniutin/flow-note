@@ -17,10 +17,18 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
     return res.json() as Promise<T>;
 }
 
+// proto enum → short role (backend returns "PAGE_PERMISSION_ROLE_EDITOR", we type "editor")
+function normalizeRole(raw: string): PagePermissionRole {
+    if (raw.startsWith("PAGE_PERMISSION_ROLE_")) {
+        return raw.slice("PAGE_PERMISSION_ROLE_".length).toLowerCase() as PagePermissionRole;
+    }
+    return raw as PagePermissionRole;
+}
+
 export const pagesClient = {
     async listPermissions(pageId: string): Promise<PagePermission[]> {
         const data = await req<{ permissions: PagePermission[] }>(`/v1/pages/${pageId}/permissions`);
-        return data.permissions ?? [];
+        return (data.permissions ?? []).map(p => ({ ...p, role: normalizeRole(p.role as string) }));
     },
 
     async getMyPermission(pageId: string): Promise<PagePermission | null> {

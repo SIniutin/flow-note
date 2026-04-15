@@ -22,11 +22,11 @@ declare module "@tiptap/core" {
     }
 }
 
-export const PageLinkExtension = Node.create<{ pageId: string }>({
+export const PageLinkExtension = Node.create<{ pageId: string; onNavigate?: (pageId: string) => void }>({
     name: "pageLink",
 
     addOptions() {
-        return { pageId: "" };
+        return { pageId: "", onNavigate: undefined };
     },
     group: "inline",
     inline: true,
@@ -84,9 +84,9 @@ export const PageLinkExtension = Node.create<{ pageId: string }>({
     },
 
     addProseMirrorPlugins() {
-        // Захватываем pageId в момент создания расширения — он стабилен на весь
-        // жизненный цикл этого инстанса редактора (при смене страницы редактор пересоздаётся).
-        const pageId = this.options.pageId;
+        // Захватываем pageId и onNavigate в момент создания расширения — стабильны
+        // на весь жизненный цикл этого инстанса (при смене страницы редактор пересоздаётся).
+        const { pageId, onNavigate } = this.options;
 
         const syncLinks = (doc: import("@tiptap/pm/model").Node) => {
             const pageIds: string[] = [];
@@ -102,6 +102,7 @@ export const PageLinkExtension = Node.create<{ pageId: string }>({
         };
 
         return [
+            // ── Синхронизация backlinks-стора ─────────────────────────────────
             new Plugin({
                 key: new PluginKey("pageLinkBacklinks"),
                 view(editorView) {
@@ -113,6 +114,29 @@ export const PageLinkExtension = Node.create<{ pageId: string }>({
                             }
                         },
                     };
+                },
+            }),
+
+            // ── SPA-навигация по клику на page_link ───────────────────────────
+            // Перехватываем DOM-событие click, чтобы:
+            //   1. Предотвратить дефолтное поведение <a href="#"> (скролл наверх / новая вкладка).
+            //   2. Открыть страницу внутри приложения через onNavigate.
+            new Plugin({
+                key: new PluginKey("pageLinkClick"),
+                props: {
+                    handleDOMEvents: {
+                        click(_view, event) {
+                            const target = event.target as HTMLElement;
+                            const link = target.closest("[data-page-link]") as HTMLElement | null;
+                            if (!link) return false;
+                            event.preventDefault();
+                            const targetPageId = link.getAttribute("data-page-id");
+                            if (targetPageId && onNavigate) {
+                                onNavigate(targetPageId);
+                            }
+                            return true;
+                        },
+                    },
                 },
             }),
         ];

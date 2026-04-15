@@ -25,6 +25,7 @@ import { MentionExtension }  from "./mention/mentionExtension";
 import { MwsTableExtension } from "./mwsTable/MwsTableExtension";
 
 import * as collabProvider from "./collab/collabProvider";
+import { pagesStore } from "../data/pagesStore";
 import "./collab/collab.css";
 import type { EditorUser } from "../data/useCurrentUser";
 
@@ -105,7 +106,10 @@ export function createEditorExtensions(currentUser: EditorUser, pageId = "") {
         // ── Schema extensions ─────────────────────────────────────────────
         BlockIdExtension,
         EmbedMediaExtension,
-        PageLinkExtension.configure({ pageId }),
+        PageLinkExtension.configure({
+            pageId,
+            onNavigate: (id) => pagesStore.setCurrentId(id),
+        }),
         MediaInlineExtension,
         TableOfContentsExtension,
 

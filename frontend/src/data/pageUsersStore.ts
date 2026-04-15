@@ -19,9 +19,10 @@ export interface PageUser {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let _pageId: string | null = null;
-let _users:  PageUser[]   = [];
-let _loading = false;
+let _pageId:  string | null = null;
+let _users:   PageUser[]    = [];
+let _loading  = false;
+let _loadGen  = 0; // incremented on reset to invalidate in-flight loads
 
 const listeners = new Set<() => void>();
 function notify() { listeners.forEach(l => l()); }
@@ -41,16 +42,19 @@ export const pageUsersStore = {
         _pageId  = pageId;
         _loading = true;
         _users   = [];
+        const gen = _loadGen; // capture before any await
         notify();
 
         try {
             const { permissions } = await pageClient.listPermissions(pageId);
+            if (gen !== _loadGen) return; // reset() was called while loading
             const token = getAccessToken() ?? undefined;
 
             const settled = await Promise.allSettled(
                 permissions.map(p => authClient.getById(p.userId, token))
             );
 
+            if (gen !== _loadGen) return; // reset() was called while resolving users
             _users = settled
                 .flatMap((r, i) => {
                     if (r.status === "fulfilled") return [r.value.user];
@@ -59,19 +63,24 @@ export const pageUsersStore = {
                 })
                 .map(u => ({ id: u.id, login: u.login, email: u.email }));
         } catch (err) {
+            if (gen !== _loadGen) return;
             console.warn("[pageUsersStore] load failed:", err);
             _users = [];
         } finally {
-            _loading = false;
-            notify();
+            if (gen === _loadGen) {
+                _loading = false;
+                notify();
+            }
         }
     },
 
     /** Сбрасывает кэш при смене страницы. */
     reset(pageId: string): void {
         if (_pageId !== pageId) {
-            _pageId = null;
-            _users  = [];
+            _pageId  = null;
+            _loading = false; // allow new load to start immediately
+            _loadGen++;       // invalidate any in-flight load
+            _users   = [];
             notify();
         }
     },
