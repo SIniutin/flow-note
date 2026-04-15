@@ -163,6 +163,16 @@ export async function logout() {
 
 export function isAuthenticated(): boolean { return !!_accessToken; }
 
+/**
+ * Вызывается из API-клиентов при получении 401 от сервера.
+ * Сбрасывает токены и уведомляет React — AuthGate покажет страницу входа.
+ */
+export function handleUnauthorized(): void {
+    if (!_accessToken) return; // уже разлогинены
+    wipe();
+    notify();
+}
+
 // Запускаем таймер сразу при загрузке, если токен уже есть в localStorage
 scheduleTokenRefresh();
 

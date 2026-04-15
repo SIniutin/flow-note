@@ -6,7 +6,7 @@
 //   GET  /v1/media/snapshots/{page_id}/latest/download  → latest snapshot URL
 //   GET  /v1/media/snapshots/{page_id}/{version_id}/download → versioned snapshot
 
-import { getAccessToken } from "../data/authStore";
+import { getAccessToken, handleUnauthorized } from "../data/authStore";
 
 function authHeaders(): Record<string, string> {
     const token = getAccessToken();
@@ -47,7 +47,7 @@ export const mediaClient = {
             headers: authHeaders(),
             body:    "{}",
         });
-        if (!res.ok) throw new Error(`[mediaClient] getUploadUrl ${res.status}`);
+        if (!res.ok) { if (res.status === 401) handleUnauthorized(); throw new Error(`[mediaClient] getUploadUrl ${res.status}`); }
         return res.json() as Promise<UploadUrlResponse>;
     },
 
@@ -72,7 +72,7 @@ export const mediaClient = {
         const res = await fetch(`/v1/${pageId}/media/${mediaId}/download`, {
             headers: authHeaders(),
         });
-        if (!res.ok) throw new Error(`[mediaClient] getDownloadUrl ${res.status}`);
+        if (!res.ok) { if (res.status === 401) handleUnauthorized(); throw new Error(`[mediaClient] getDownloadUrl ${res.status}`); }
         const json: DownloadUrlResponse = await res.json();
         return json.download_url;
     },
@@ -94,7 +94,7 @@ export const mediaClient = {
         const res = await fetch(`/v1/media/snapshots/${pageId}/latest/download`, {
             headers: authHeaders(),
         });
-        if (!res.ok) throw new Error(`[mediaClient] getLatestSnapshot ${res.status}`);
+        if (!res.ok) { if (res.status === 401) handleUnauthorized(); throw new Error(`[mediaClient] getLatestSnapshot ${res.status}`); }
         const json: DownloadUrlResponse = await res.json();
         return json.download_url;
     },
@@ -106,7 +106,7 @@ export const mediaClient = {
         const res = await fetch(`/v1/media/snapshots/${pageId}/${versionId}/download`, {
             headers: authHeaders(),
         });
-        if (!res.ok) throw new Error(`[mediaClient] getSnapshot ${res.status}`);
+        if (!res.ok) { if (res.status === 401) handleUnauthorized(); throw new Error(`[mediaClient] getSnapshot ${res.status}`); }
         const json: DownloadUrlResponse = await res.json();
         return json.download_url;
     },

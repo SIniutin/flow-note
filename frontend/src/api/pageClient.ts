@@ -1,4 +1,4 @@
-import { getAccessToken } from "../data/authStore";
+import { getAccessToken, handleUnauthorized } from "../data/authStore";
 
 export interface BackendPage {
     id:          string;
@@ -17,6 +17,7 @@ async function authFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 
     const res = await fetch(path, { ...init, headers });
     if (!res.ok) {
+        if (res.status === 401) handleUnauthorized();
         const text = await res.text().catch(() => "");
         let message = text;
         try { message = JSON.parse(text).message ?? text; } catch { /* raw text */ }
@@ -109,7 +110,7 @@ export const pageClient = {
         return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/connected`);
     },
 
-    listVersions(pageId: string): Promise<{ versions: BackendVersion[] }> {
-        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/versions`);
+    listVersions(pageId: string, limit = 100, offset = 0): Promise<{ versions: BackendVersion[] }> {
+        return authFetch(`/v1/pages/${encodeURIComponent(pageId)}/versions?pagination.limit=${limit}&pagination.offset=${offset}`);
     },
 };
