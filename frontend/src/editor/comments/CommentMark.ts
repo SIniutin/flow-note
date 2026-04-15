@@ -8,7 +8,7 @@ declare module "@tiptap/core" {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     interface Commands<ReturnType> {
         commentMark: {
-            setCommentMark: (threadId: string) => ReturnType;
+            setCommentMark: (threadId: string, from: number, to: number) => ReturnType;
             unsetCommentMark: (threadId: string) => ReturnType;
         };
     }
@@ -46,28 +46,30 @@ export const CommentMark = Mark.create<CommentMarkOptions>({
     },
     addCommands() {
         return {
-            setCommentMark: (threadId) => ({ tr, dispatch, state }) => {
-                if (!dispatch) return false;
-                const { from, to } = state.selection;
-                const type = state.schema.marks[this.name];
-                tr.addMark(from, to, type.create({ threadId }));
-                tr.setMeta("addToHistory", false);
-                dispatch(tr);
+            // Принимает явный диапазон (from/to) чтобы не зависеть от текущего selection —
+            // к моменту submit() редактор мог потерять фокус и selection сбрасывается.
+            setCommentMark: (threadId: string, from: number, to: number) => ({ tr, dispatch }) => {
+                if (from === to) return false;
+                const type = tr.doc.type.schema.marks["commentMark"];
+                if (!type) return false;
+                if (dispatch) {
+                    tr.addMark(from, to, type.create({ threadId }));
+                    tr.setMeta("addToHistory", false);
+                }
                 return true;
             },
-            unsetCommentMark: (threadId) => ({ tr, dispatch, state }) => {
-                if (!dispatch) return false;
-                const { doc } = state;
+            unsetCommentMark: (threadId: string) => ({ tr, dispatch, state }) => {
                 const type = state.schema.marks[this.name];
-                doc.descendants((node, pos) => {
-                    node.marks.forEach(m => {
-                        if (m.type === type && m.attrs.threadId === threadId) {
-                            tr.removeMark(pos, pos + node.nodeSize, m);
-                        }
+                if (dispatch) {
+                    state.doc.descendants((node, pos) => {
+                        node.marks.forEach(m => {
+                            if (m.type === type && m.attrs.threadId === threadId) {
+                                tr.removeMark(pos, pos + node.nodeSize, m);
+                            }
+                        });
                     });
-                });
-                tr.setMeta("addToHistory", false);
-                dispatch(tr);
+                    tr.setMeta("addToHistory", false);
+                }
                 return true;
             },
         };

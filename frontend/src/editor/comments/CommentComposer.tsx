@@ -19,8 +19,19 @@ export function CommentComposer({ editor, open, onClose }: Props) {
     const currentUser = useCurrentUser();
     const [text, setText] = useState("");
     const inputRef = useRef<HTMLInputElement>(null);
+    // Сохраняем диапазон выделения в момент открытия composer-а.
+    // К моменту submit() редактор мог потерять фокус и selection сбросился.
+    const savedRangeRef = useRef<{ from: number; to: number } | null>(null);
 
-    useEffect(() => { if (!open) setText(""); }, [open]);
+    useEffect(() => {
+        if (open && editor && !editor.state.selection.empty) {
+            const { from, to } = editor.state.selection;
+            savedRangeRef.current = { from, to };
+        } else if (!open) {
+            savedRangeRef.current = null;
+            setText("");
+        }
+    }, [open, editor]);
 
     // Автофокус при открытии
     useEffect(() => {
@@ -29,11 +40,12 @@ export function CommentComposer({ editor, open, onClose }: Props) {
 
     const submit = () => {
         if (!editor || !text.trim()) return;
+        const range = savedRangeRef.current;
+        if (!range) return;
         const id = newThreadId();
-        editor.chain().focus().setCommentMark(id).run();
+        editor.chain().focus().setCommentMark(id, range.from, range.to).run();
         addThread(text.trim(), currentUser.name, currentUser.id, id);
         onClose();
-        setText("");
     };
 
     return (
