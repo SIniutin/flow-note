@@ -23,7 +23,7 @@ export const config = {
   s3SecretKey: str("S3_SECRET_KEY", "minioadmin"),
   s3Region:    str("S3_REGION",     "us-east-1"),
 
-  // ── pages-service gRPC ────────────────────────────────────────────────────
-  pagesGrpcAddr: str("PAGES_GRPC_ADDR", "localhost:50051"),
+  // ── pages-service HTTP (gRPC-gateway) ─────────────────────────────────────
+  pagesHttpAddr: str("PAGES_HTTP_ADDR", "http://page-service:8080"),
   pagesAuthToken: str("PAGES_AUTH_TOKEN", ""),
 } as const;

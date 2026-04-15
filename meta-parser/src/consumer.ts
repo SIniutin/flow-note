@@ -30,8 +30,15 @@ interface SnapshotUploadedEvent {
   ts:         number;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 async function processEvent(event: SnapshotUploadedEvent): Promise<void> {
   const { page_id, s3_key } = event;
+
+  if (!UUID_RE.test(page_id)) {
+    console.warn(`[worker] skip  page="${page_id}" — not a valid UUID`);
+    return;
+  }
 
   console.log(`[worker] processing  page=${page_id}  s3_key=${s3_key}`);
 
@@ -43,7 +50,10 @@ async function processEvent(event: SnapshotUploadedEvent): Promise<void> {
     `[worker] parsed  page=${page_id}  title="${meta.title}"  words=${meta.wordCount}  links=${meta.links.length}  mentions=${meta.mentions.length}  tables=[${meta.tables.map((table) => table.dstId).join(", ")}]`
   );
 
-  await replacePageRelations(page_id, meta);
+  await replacePageRelations(page_id, meta, {
+    sizeBytes: event.size_bytes,
+    snapshotKey: s3_key,
+  });
   console.log(`[worker] ReplacePageRelations OK  page=${page_id}`);
 }
 

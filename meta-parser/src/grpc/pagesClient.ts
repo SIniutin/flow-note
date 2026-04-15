@@ -1,93 +1,86 @@
-import * as grpc from "@grpc/grpc-js";
-import * as protoLoader from "@grpc/proto-loader";
-import fs from "node:fs";
-import path from "node:path";
 import { config } from "../config";
 import { PageMetadata } from "../parser/ydocParser";
 
-const SHARED_PROTO_PATH = path.resolve(__dirname, "../../../api-contracts/proto/pages/v1/pages.proto");
-const LOCAL_PROTO_PATH = path.resolve(__dirname, "../../proto/pages/v1/pages.proto");
-const PROTO_PATH = fs.existsSync(SHARED_PROTO_PATH) ? SHARED_PROTO_PATH : LOCAL_PROTO_PATH;
-const INCLUDE_DIRS = fs.existsSync(SHARED_PROTO_PATH)
-  ? [path.resolve(__dirname, "../../../api-contracts")]
-  : [path.resolve(__dirname, "../../proto")];
+function buildHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
 
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true,
-  longs:    String,
-  enums:    String,
-  defaults: true,
-  oneofs:   true,
-  includeDirs: INCLUDE_DIRS,
-});
+  if (config.pagesAuthToken) {
+    headers.authorization = `Bearer ${config.pagesAuthToken}`;
+  }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const proto = grpc.loadPackageDefinition(packageDefinition) as any;
-
-const client = new proto.pages.v1.PagesService(
-  config.pagesGrpcAddr,
-  grpc.credentials.createInsecure()
-);
-
-function buildMetadata(): grpc.Metadata | undefined {
-  if (!config.pagesAuthToken) return undefined;
-
-  const md = new grpc.Metadata();
-  md.set("authorization", `Bearer ${config.pagesAuthToken}`);
-  return md;
+  return headers;
 }
 
-function unaryCall(method: string, payload: object): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const metadata = buildMetadata();
-    const cb = (err: grpc.ServiceError | null) => {
-      if (err) reject(err);
-      else resolve();
-    };
+async function httpCall(method: string, url: string, payload?: object): Promise<void> {
+  const res = await fetch(new URL(url, config.pagesHttpAddr), {
+    method,
+    headers: buildHeaders(),
+    body: payload ? JSON.stringify(payload) : undefined,
+  });
 
-    if (metadata) {
-      client[method](payload, metadata, cb);
-      return;
-    }
+  if (res.ok) return;
 
-    client[method](
-      payload,
-      (err: grpc.ServiceError | null) => {
-        if (err) reject(err);
-        else resolve();
-      }
-    );
+  const text = await res.text();
+  throw new Error(`${res.status} ${res.statusText}: ${text || "request failed"}`);
+}
+
+/**
+ * Парсит key_to_snapshot из полного S3-ключа.
+ * Формат ключа: snapshots/{pageId}/{key_to_snapshot}.bin
+ * Возвращает только {key_to_snapshot} — имя файла без расширения.
+ */
+function parseSnapshotKey(s3Key: string): string {
+  const filename = s3Key.split("/").at(-1) ?? s3Key;
+  return filename.endsWith(".bin") ? filename.slice(0, -4) : filename;
+}
+
+async function updatePage(pageId: string, meta: PageMetadata, sizeBytes: number, snapshotKey: string): Promise<void> {
+  const title = meta.title.trim();
+  if (!title) return;
+
+  await httpCall("PATCH", `/v1/pages/${pageId}`, {
+    page_id: pageId,
+    title,
+    size: sizeBytes,
+    key_to_snapshot: parseSnapshotKey(snapshotKey),
   });
 }
 
 /**
- * Синхронизирует извлечённые из snapshot связи страницы с pages-service.
- * Сейчас отправляем links, mentions и tables; media пока остаётся пустым replace-запросом.
+ * Синхронизирует title и извлечённые из snapshot связи страницы с pages-service.
+ * Использует HTTP gateway page-service, чтобы meta-parser не держал локальные proto.
  */
-export async function replacePageRelations(pageId: string, meta: PageMetadata): Promise<void> {
+export async function replacePageRelations(
+  pageId: string,
+  meta: PageMetadata,
+  snapshot: { sizeBytes: number; snapshotKey: string },
+): Promise<void> {
   await Promise.all([
-    unaryCall("ReplacePageLinks", {
+    updatePage(pageId, meta, snapshot.sizeBytes, snapshot.snapshotKey),
+    httpCall("POST", "/pages.v1.PagesService/ReplacePageLinks", {
       page_id: pageId,
       links: meta.links.map((link) => ({
         to_page_id: link.toPageId,
         block_id: link.blockId,
       })),
     }),
-    unaryCall("ReplacePageMentions", {
+    httpCall("POST", "/pages.v1.PagesService/ReplacePageMentions", {
       page_id: pageId,
       mentions: meta.mentions.map((mention) => ({
         user_id: mention.userId,
         block_id: mention.blockId,
       })),
     }),
-    unaryCall("ReplacePageTables", {
+    httpCall("POST", "/pages.v1.PagesService/ReplacePageTables", {
       page_id: pageId,
       tables: meta.tables.map((table) => ({
         dst_id: table.dstId,
         block_id: table.blockId,
       })),
     }),
-    unaryCall("ReplacePageMedia", {
+    httpCall("POST", "/pages.v1.PagesService/ReplacePageMedia", {
       page_id: pageId,
       media: [],
     }),
