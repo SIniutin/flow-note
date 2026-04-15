@@ -24,7 +24,7 @@ func UnaryAuthInterceptor(v authsecurity.Verifier, whitelist map[string]struct{}
 		if IsWhitelisted(whitelist, info.FullMethod) {
 			return handler(ctx, req)
 		}
-
+		println(info.FullMethod)
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "missing metadata")

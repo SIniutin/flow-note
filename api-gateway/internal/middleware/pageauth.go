@@ -112,7 +112,7 @@ func (pc *PagePermCache) Middleware(next http.Handler) http.Handler {
 
 		token := httpauth.ExtractAccessToken(r)
 
-		_, err := pc.getPermission(r.Context(), pageID, userID, token)
+		role, err := pc.getPermission(r.Context(), pageID, userID, token)
 		if err != nil {
 			if st, _ := status.FromError(err); st.Code() == codes.NotFound {
 				http.Error(w, "forbidden", http.StatusForbidden)
@@ -126,13 +126,18 @@ func (pc *PagePermCache) Middleware(next http.Handler) http.Handler {
 			// fail-open: let page-service enforce on its own
 		}
 
+		ctx := authctx.WithAuthInfo(r.Context(), authctx.AuthInfo{
+			UserID: userID,
+			Role:   role,
+		})
+
 		// Invalidate after permission-mutating requests finish
 		if isPermMutation(r) {
 			targetUser := extractPermTargetUser(r.URL.Path)
 			defer pc.invalidate(r.Context(), pageID, targetUser)
 		}
 
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -158,6 +163,7 @@ func (pc *PagePermCache) getPermission(ctx context.Context, pageID, userID, toke
 	}
 
 	role := resp.GetPermission().GetRole().String()
+	println(role, "huinya")
 	if err := pc.rdb.Set(ctx, key, role, permCacheTTL).Err(); err != nil {
 		pc.logger.Warn("redis SET failed", zap.Error(err))
 	}

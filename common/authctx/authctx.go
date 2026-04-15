@@ -69,20 +69,35 @@ func ParseUserRoleFromCtx(ctx context.Context) (perm.PermissionRole, error) {
 		return "", ErrMissingUserRoleInContext
 	}
 
-	role := perm.PermissionRole(authInfo.Role)
-	ok = isValidPermissionRole(role)
+	ok = isValidPermissionRole(authInfo.Role)
+	println(ok, authInfo.Role)
 	if !ok {
 		return "", ErrInvalidUserRoleInContext
 	}
 
-	return role, nil
+	return MapRoleFromProto(authInfo.Role), nil
 }
 
-func isValidPermissionRole(role perm.PermissionRole) bool {
+func isValidPermissionRole(role string) bool {
 	switch role {
-	case "owner", "editor", "viewer", "mentor", "commenter":
+	case "PAGE_PERMISSION_ROLE_OWNER", "PAGE_PERMISSION_ROLE_EDITOR", "PAGE_PERMISSION_ROLE_VIEWER", "PAGE_PERMISSION_ROLE_MENTOR", "PAGE_PERMISSION_ROLE_COMMENTER":
 		return true
 	default:
 		return false
 	}
+}
+
+var protoToDomainRole = map[string]perm.PermissionRole{
+	"PAGE_PERMISSION_ROLE_VIEWER":      perm.RoleViewer,
+	"PAGE_PERMISSION_ROLE_COMMENTER":   perm.RoleCommenter,
+	"PAGE_PERMISSION_ROLE_EDITOR":      perm.RoleEditor,
+	"PAGE_PERMISSION_ROLE_MENTOR":      perm.RoleMentor,
+	"PAGE_PERMISSION_ROLE_OWNER":       perm.RoleOwner,
+	"PAGE_PERMISSION_ROLE_UNSPECIFIED": perm.RoleUnspecified,
+}
+
+func MapRoleFromProto(role string) perm.PermissionRole {
+	domainRole, _ := protoToDomainRole[role]
+
+	return domainRole
 }
