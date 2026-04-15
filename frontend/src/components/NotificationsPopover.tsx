@@ -1,7 +1,10 @@
 // ─── src/components/NotificationsPopover.tsx ─────────────────────────────────
 // Колокольчик с дропдауном уведомлений.
+// Соединение: SSE /v1/notifications/stream?token=<jwt>.
+// При reconnect делает full-fetch чтобы не пропустить события.
+// Рассылает CustomEvent в окно при permission/comment нотификациях.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { notifyClient, type Notification, NOTIFICATION_LABELS } from "../api/notifyClient";
 import { getAccessToken } from "../data/authStore";
 import "./notificationsPopover.css";
@@ -21,17 +24,40 @@ function isRead(n: Notification): boolean {
     return !!n.readAt && !n.cancelledAt;
 }
 
+const PERMISSION_TYPES = new Set([
+    "NOTIFICATION_TYPE_GRAND_PERMISSION",
+    "NOTIFICATION_TYPE_REVOKE_PERMISSION",
+]);
+
+const COMMENT_TYPES = new Set([
+    "NOTIFICATION_TYPE_COMMENT_THREAD",
+    "NOTIFICATION_TYPE_COMMENT_REPLY",
+    "NOTIFICATION_TYPE_COMMENT_MENTION",
+    "NOTIFICATION_TYPE_MENTION_COMMENT",
+    "NOTIFICATION_TYPE_MENTION_PAGE",
+]);
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function NotificationsPopover() {
-    const [open, setOpen]               = useState(false);
-    const [items, setItems]             = useState<Notification[]>([]);
-    const [loading, setLoading]         = useState(false);
-    const [markingAll, setMarkingAll]   = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
+    const [open, setOpen]             = useState(false);
+    const [items, setItems]           = useState<Notification[]>([]);
+    const [loading, setLoading]       = useState(false);
+    const [markingAll, setMarkingAll] = useState(false);
+    const ref    = useRef<HTMLDivElement>(null);
+    const esRef  = useRef<EventSource | null>(null);
 
     const unreadCount = items.filter(n => !isRead(n)).length;
 
+    // ── full fetch (initial + post-reconnect) ─────────────────────────────────
+    const fetchAll = useCallback(() => {
+        if (!getAccessToken()) return;
+        notifyClient.getNotifications({ pageSize: 50 })
+            .then(res => setItems(res?.notifications ?? []))
+            .catch(() => {});
+    }, []);
+
+    // Загружаем при открытии дропдауна
     const load = () => {
         if (!getAccessToken()) return;
         setLoading(true);
@@ -40,30 +66,79 @@ export function NotificationsPopover() {
             .catch(() => {})
             .finally(() => setLoading(false));
     };
+    useEffect(() => { if (open) load(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Загружаем при открытии
-    useEffect(() => { if (open) load(); }, [open]);
+    // ── SSE ───────────────────────────────────────────────────────────────────
+    const openSSE = useCallback(() => {
+        const token = getAccessToken();
+        if (!token) return;
+        if (esRef.current && esRef.current.readyState !== EventSource.CLOSED) return;
 
-    // Периодически обновляем счётчик (раз в 60с).
-    // При 401 останавливаем поллинг — токен невалиден, handleUnauthorized сделает redirect.
-    useEffect(() => {
-        if (!getAccessToken()) return;
-        let stopped = false;
-        const fetch = () => {
-            if (stopped || !getAccessToken()) return;
-            notifyClient.getNotifications({ pageSize: 50 })
-                .then(res => { if (!stopped) setItems(res?.notifications ?? []); })
-                .catch(err => {
-                    const msg = String(err?.message ?? "");
-                    if (msg.includes("401") || msg.includes("403")) stopped = true;
-                });
-        };
-        fetch();
-        const t = setInterval(fetch, 60_000);
-        return () => { stopped = true; clearInterval(t); };
+        const url = new URL("/v1/notifications/stream", window.location.origin);
+        url.searchParams.set("token", token);
+        const es = new EventSource(url.toString());
+        esRef.current = es;
+
+        // При (ре)подключении синхронизируем весь список чтобы не пропустить
+        // уведомления, пришедшие пока соединение было разорвано.
+        es.addEventListener("open", () => { fetchAll(); });
+
+        es.addEventListener("notification", (e: MessageEvent) => {
+            try {
+                const n = JSON.parse(e.data) as Notification;
+
+                // Добавляем в список, если ещё нет
+                setItems(prev =>
+                    prev.some(x => x.id === n.id) ? prev : [n, ...prev],
+                );
+
+                // Рассылаем события в приложение
+                if (PERMISSION_TYPES.has(n.type)) {
+                    window.dispatchEvent(new CustomEvent("wiki:permission-changed"));
+                }
+                if (COMMENT_TYPES.has(n.type) && n.payload?.pageId) {
+                    window.dispatchEvent(
+                        new CustomEvent("wiki:comments-updated", {
+                            detail: { pageId: n.payload.pageId },
+                        }),
+                    );
+                }
+            } catch { /* malformed JSON */ }
+        });
+
+        es.addEventListener("error", () => {
+            // EventSource сам переподключается; onerror может означать как
+            // временный разрыв, так и постоянную ошибку (401, 502).
+            // Если соединение закрыто браузером (CLOSED) — открываем заново
+            // после небольшой задержки.
+            if (es.readyState === EventSource.CLOSED) {
+                esRef.current = null;
+                setTimeout(() => openSSE(), 5_000);
+            }
+        });
+    }, [fetchAll]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const closeSSE = useCallback(() => {
+        esRef.current?.close();
+        esRef.current = null;
     }, []);
 
-    // Закрытие при клике снаружи
+    useEffect(() => {
+        if (!getAccessToken()) return;
+        fetchAll();
+        openSSE();
+
+        // При обновлении JWT-токена переподключаем SSE с новым токеном
+        const onRefresh = () => { closeSSE(); openSSE(); };
+        window.addEventListener("auth:token-refreshed", onRefresh);
+
+        return () => {
+            closeSSE();
+            window.removeEventListener("auth:token-refreshed", onRefresh);
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── закрытие по клику снаружи ─────────────────────────────────────────────
     useEffect(() => {
         if (!open) return;
         const handler = (e: MouseEvent) => {
@@ -73,18 +148,24 @@ export function NotificationsPopover() {
         return () => document.removeEventListener("mousedown", handler);
     }, [open]);
 
+    // ── actions ───────────────────────────────────────────────────────────────
     const handleMarkRead = async (id: string) => {
         await notifyClient.markRead(id).catch(() => {});
-        setItems(prev => prev.map(n => n.id === id ? { ...n, readAt: new Date().toISOString() } : n));
+        setItems(prev =>
+            prev.map(n => n.id === id ? { ...n, readAt: new Date().toISOString() } : n),
+        );
     };
 
     const handleMarkAllRead = async () => {
         setMarkingAll(true);
         await notifyClient.markAllRead().catch(() => {});
-        setItems(prev => prev.map(n => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })));
+        setItems(prev =>
+            prev.map(n => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })),
+        );
         setMarkingAll(false);
     };
 
+    // ── render ────────────────────────────────────────────────────────────────
     return (
         <div className="notif" ref={ref}>
             <button
@@ -114,9 +195,7 @@ export function NotificationsPopover() {
                     </div>
 
                     <div className="notif__list">
-                        {loading && (
-                            <div className="notif__empty">Загрузка…</div>
-                        )}
+                        {loading && <div className="notif__empty">Загрузка…</div>}
                         {!loading && items.length === 0 && (
                             <div className="notif__empty">Нет уведомлений</div>
                         )}

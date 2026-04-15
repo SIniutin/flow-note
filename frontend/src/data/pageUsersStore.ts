@@ -78,11 +78,19 @@ export const pageUsersStore = {
     reset(pageId: string): void {
         if (_pageId !== pageId) {
             _pageId  = null;
-            _loading = false; // allow new load to start immediately
-            _loadGen++;       // invalidate any in-flight load
+            _loading = false;
+            _loadGen++;
             _users   = [];
             notify();
         }
+    },
+
+    /** Принудительно перезагружает список пользователей (например, при изменении прав). */
+    reload(pageId: string): void {
+        _pageId  = null; // обнуляем кэш, чтобы load() не пропустил запрос
+        _loading = false;
+        _loadGen++;
+        void this.load(pageId);
     },
 
     subscribe(l: () => void): () => void {

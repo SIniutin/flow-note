@@ -9,6 +9,30 @@
  */
 
 import * as Y from "yjs";
+import { createHash } from "crypto";
+
+// ── UUID helpers ──────────────────────────────────────────────────────────────
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUUID(v: string): boolean {
+  return UUID_RE.test(v);
+}
+
+/**
+ * Converts any non-UUID block_id (e.g. "b-abc123...") to a stable UUID
+ * by MD5-hashing the value and formatting it as a UUID v4 (format only).
+ * The same input always produces the same output, so re-parses stay stable.
+ */
+function toStableUUID(v: string): string {
+  const h = createHash("md5").update(v).digest("hex");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${h.slice(16, 20)}-${h.slice(20, 32)}`;
+}
+
+function normalizeBlockId(raw: unknown): string {
+  if (typeof raw !== "string" || raw.length === 0) return "";
+  return isUUID(raw) ? raw : toStableUUID(raw);
+}
 
 export interface PageMetadata {
   title:       string;         // первый heading или первый paragraph (plain text)
@@ -114,11 +138,7 @@ function walkFragment(node: Y.XmlFragment | Y.XmlElement, col: TextCollector, cu
     if (!(child instanceof Y.XmlElement)) continue;
 
     const name = child.nodeName;
-    const blockIdAttr = child.getAttribute("block_id");
-    const blockId =
-      typeof blockIdAttr === "string" && blockIdAttr.length > 0
-        ? blockIdAttr
-        : currentBlockId;
+    const blockId = normalizeBlockId(child.getAttribute("block_id")) || currentBlockId;
 
     if (name === "mws_table" || name === "mwsTable") {
       const dstId = child.getAttribute("dst_id");

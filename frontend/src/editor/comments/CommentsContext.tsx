@@ -12,9 +12,7 @@ const formatDate = () => new Date().toLocaleString("ru-RU", {
 
 const newReplyId = () => `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
-/** Конвертирует плоский список ProtoComment в иерархию Thread[].
- *  bodyId на бэкенде = threadId (ID comment mark в редакторе).
- *  Корневые комменты группируются по bodyId; ответы — по parentId. */
+/** Конвертирует плоский список ProtoComment в иерархию Thread[]. */
 function commentsToThreads(comments: ProtoComment[]): Thread[] {
     const rootComments = comments.filter(c => !c.parentId && !c.deleted);
     const byParent = new Map<string, ProtoComment[]>();
@@ -25,8 +23,6 @@ function commentsToThreads(comments: ProtoComment[]): Thread[] {
     });
 
     return rootComments.map(c => ({
-        // bodyId связывает бэкенд-комментарий с ProseMirror mark через threadId.
-        // Если bodyId пустой — используем id комментария как fallback.
         id:        c.bodyId || c.id,
         author:    c.userId,
         authorId:  c.userId,
@@ -42,6 +38,33 @@ function commentsToThreads(comments: ProtoComment[]): Thread[] {
             createdAt: r.createdAt ?? formatDate(),
         } satisfies Reply)),
     }));
+}
+
+/**
+ * Сливает данные из API с локальным состоянием:
+ * - Добавляет новые треды от других пользователей
+ * - Добавляет новые ответы в существующие треды
+ * - Не трогает локальные данные (orphaned, resolved) — они не хранятся на сервере
+ */
+function mergeFromApi(local: Thread[], fromApi: Thread[]): Thread[] {
+    const apiMap = new Map(fromApi.map(t => [t.id, t]));
+    let changed = false;
+
+    const updated = local.map(localThread => {
+        const apiThread = apiMap.get(localThread.id);
+        if (!apiThread) return localThread;
+        const localReplyIds = new Set(localThread.replies.map(r => r.id));
+        const newReplies = apiThread.replies.filter(r => !localReplyIds.has(r.id));
+        if (newReplies.length === 0) return localThread;
+        changed = true;
+        return { ...localThread, replies: [...localThread.replies, ...newReplies] };
+    });
+
+    const localIds = new Set(local.map(t => t.id));
+    const newThreads = fromApi.filter(t => !localIds.has(t.id));
+
+    if (!changed && newThreads.length === 0) return local;
+    return [...updated, ...newThreads];
 }
 
 interface Props {
@@ -62,23 +85,47 @@ export function CommentsProvider({ children, pageId }: Props) {
     // Сохраняем в localStorage
     useEffect(() => { saveThreads(threads, pageId); }, [threads, pageId]);
 
-    // Синхронизация с API при монтировании
-    useEffect(() => {
+    // ── Синхронизация с API ───────────────────────────────────────────────────
+    const syncFromApi = useCallback(() => {
         if (!pageId || !getAccessToken()) return;
         commentClient.listComments(pageId)
             .then(res => {
                 const items = res?.comments ?? [];
                 if (items.length === 0) return;
                 const fromApi = commentsToThreads(items);
-                setThreads(prev => {
-                    const existingIds = new Set(prev.map(t => t.id));
-                    const fresh = fromApi.filter(t => !existingIds.has(t.id));
-                    return fresh.length > 0 ? [...prev, ...fresh] : prev;
-                });
+                setThreads(prev => mergeFromApi(prev, fromApi));
             })
-            .catch(() => { /* API недоступен — работаем с localStorage */ });
+            .catch(() => {});
     }, [pageId]);
 
+    // Начальная синхронизация при смене страницы
+    useEffect(() => { syncFromApi(); }, [syncFromApi]);
+
+    // ── Подписка на комментарии страницы + SSE-driven обновления ─────────────
+    // Подписываемся, чтобы notify-service рассылал уведомления о новых
+    // комментариях всем участникам страницы. Это позволяет NotificationsPopover
+    // получать события через SSE и диспатчить wiki:comments-updated.
+    useEffect(() => {
+        if (!pageId || !getAccessToken()) return;
+        commentClient.subscribe(pageId).catch(() => {});
+        return () => {
+            commentClient.unsubscribe(pageId).catch(() => {});
+        };
+    }, [pageId]);
+
+    // Слушаем wiki:comments-updated — приходит от NotificationsPopover
+    // когда SSE доставляет нотификацию о новом комментарии на этой странице.
+    useEffect(() => {
+        if (!pageId) return;
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ pageId: string }>).detail;
+            if (detail?.pageId === pageId) syncFromApi();
+        };
+        window.addEventListener("wiki:comments-updated", handler);
+        return () => window.removeEventListener("wiki:comments-updated", handler);
+    }, [pageId, syncFromApi]);
+
+    // ── Мутации ───────────────────────────────────────────────────────────────
     const addThread = useCallback((text: string, author: string, authorId: string, id?: string): Thread => {
         const threadId = id ?? newThreadId();
         const t: Thread = {
@@ -92,8 +139,8 @@ export function CommentsProvider({ children, pageId }: Props) {
             commentClient.makeComment({
                 pageId,
                 body:   text,
-                bodyId: threadId, // связываем с comment mark в редакторе
-            }).catch(() => { /* silent */ });
+                bodyId: threadId,
+            }).catch(() => {});
         }
 
         return t;
@@ -106,28 +153,26 @@ export function CommentsProvider({ children, pageId }: Props) {
             ? { ...t, replies: [...t.replies, { id: replyId, author, authorId, text: text.trim(), createdAt: formatDate() }] }
             : t));
 
-        // Находим id родительского комментария по threadId (bodyId).
-        // Если нет — отправляем как корневой с тем же bodyId.
         if (pageId && getAccessToken()) {
             commentClient.makeComment({
                 pageId,
                 body:     text.trim(),
                 bodyId:   threadId,
-                parentId: threadId, // бэкенд разберёт по bodyId
-            }).catch(() => { /* silent */ });
+                parentId: threadId,
+            }).catch(() => {});
         }
     }, [pageId]);
 
-    const getThread       = useCallback((id: string) => threads.find(t => t.id === id), [threads]);
-    const resolveThread   = useCallback((id: string) =>
+    const getThread      = useCallback((id: string) => threads.find(t => t.id === id), [threads]);
+    const resolveThread  = useCallback((id: string) =>
         setThreads(prev => prev.map(t => t.id === id ? { ...t, resolved: true } : t)), []);
-    const removeThread    = useCallback((id: string) =>
+    const removeThread   = useCallback((id: string) =>
         setThreads(prev => prev.filter(t => t.id !== id)), []);
-    const removeReply     = useCallback((threadId: string, replyId: string) =>
+    const removeReply    = useCallback((threadId: string, replyId: string) =>
         setThreads(prev => prev.map(t => t.id === threadId
             ? { ...t, replies: t.replies.filter(r => r.id !== replyId) }
             : t)), []);
-    const setOrphanedIds  = useCallback((orphanedIds: Set<string>) => {
+    const setOrphanedIds = useCallback((orphanedIds: Set<string>) => {
         setThreads(prev => {
             let changed = false;
             const next = prev.map(t => {

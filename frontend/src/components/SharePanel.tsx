@@ -83,6 +83,13 @@ export function SharePanel({ pageId, onClose }: SharePanelProps) {
 
     useEffect(() => { loadMembers(); }, [pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+    // Перезагружаем участников при изменении прав (через SSE → wiki:permission-changed)
+    useEffect(() => {
+        const handler = () => { loadMembers(); };
+        window.addEventListener("wiki:permission-changed", handler);
+        return () => window.removeEventListener("wiki:permission-changed", handler);
+    }, [pageId]); // eslint-disable-line react-hooks/exhaustive-deps
+
     async function handleSearch() {
         if (!login.trim()) return;
         setSearching(true);

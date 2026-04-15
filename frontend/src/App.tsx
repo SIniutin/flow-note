@@ -82,8 +82,6 @@ export default function App() {
     const [refreshKey, setRefreshKey] = useState(0);
 
     // Обновляем список страниц и роль при возврате на вкладку.
-    // Это позволяет гrantee увидеть новые доступные страницы и изменения роли
-    // без перезагрузки страницы.
     useEffect(() => {
         const handler = () => {
             if (document.visibilityState === "visible") {
@@ -94,6 +92,19 @@ export default function App() {
         document.addEventListener("visibilitychange", handler);
         return () => document.removeEventListener("visibilitychange", handler);
     }, []);
+
+    // wiki:permission-changed — приходит от NotificationsPopover через SSE
+    // когда кто-то выдал или отозвал доступ. Немедленно обновляем:
+    // список страниц, роль текущего пользователя, список участников для @-mention.
+    useEffect(() => {
+        const handler = () => {
+            void pagesStore.loadFromBackend();
+            setRefreshKey(k => k + 1);
+            if (pageId) pageUsersStore.reload(pageId);
+        };
+        window.addEventListener("wiki:permission-changed", handler);
+        return () => window.removeEventListener("wiki:permission-changed", handler);
+    }, [pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // При смене страницы: загружаем пользователей с доступом (для @ mention).
     useEffect(() => {

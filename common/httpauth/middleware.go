@@ -53,5 +53,10 @@ func ExtractAccessToken(r *http.Request) string {
 		return c.Value
 	}
 
+	// ?token= query param — used by EventSource which cannot set custom headers.
+	if token := r.URL.Query().Get("token"); token != "" {
+		return token
+	}
+
 	return ""
 }
