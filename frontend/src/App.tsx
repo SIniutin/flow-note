@@ -36,6 +36,7 @@ import {useIncomingLinks} from "./data/pagelinksStore";
 import {PagePickerModal} from "./editor/schema/PagePickerModal";
 import {EditorContextMenu} from "./editor/ContextMenu";
 import {PageGraph} from "./components/PageGraph";
+import {NotificationsPopover} from "./components/NotificationsPopover";
 
 import "./components/sidebar.css";
 
@@ -331,6 +332,7 @@ export default function App() {
     const tabs = (
         <>
             <PresenceAvatars/>
+            <NotificationsPopover/>
             <span style={{fontSize:"var(--fs-sm)",color:"var(--text-secondary)"}}>
                 {user?.login ?? user?.email ?? ""}
             </span>

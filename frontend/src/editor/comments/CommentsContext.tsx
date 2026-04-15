@@ -12,7 +12,9 @@ const formatDate = () => new Date().toLocaleString("ru-RU", {
 
 const newReplyId = () => `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 
-/** Конвертирует плоский список ProtoComment в иерархию Thread[]. */
+/** Конвертирует плоский список ProtoComment в иерархию Thread[].
+ *  bodyId на бэкенде = threadId (ID comment mark в редакторе).
+ *  Корневые комменты группируются по bodyId; ответы — по parentId. */
 function commentsToThreads(comments: ProtoComment[]): Thread[] {
     const rootComments = comments.filter(c => !c.parentId && !c.deleted);
     const byParent = new Map<string, ProtoComment[]>();
@@ -23,7 +25,9 @@ function commentsToThreads(comments: ProtoComment[]): Thread[] {
     });
 
     return rootComments.map(c => ({
-        id:        c.id,
+        // bodyId связывает бэкенд-комментарий с ProseMirror mark через threadId.
+        // Если bodyId пустой — используем id комментария как fallback.
+        id:        c.bodyId || c.id,
         author:    c.userId,
         authorId:  c.userId,
         text:      c.body,
@@ -43,10 +47,9 @@ function commentsToThreads(comments: ProtoComment[]): Thread[] {
 interface Props {
     children: ReactNode;
     pageId?: string;
-    currentUserId?: string;
 }
 
-export function CommentsProvider({ children, pageId, currentUserId }: Props) {
+export function CommentsProvider({ children, pageId }: Props) {
     const [threads, setThreads] = useState<Thread[]>(() => loadThreads(pageId));
     const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
 
@@ -77,23 +80,24 @@ export function CommentsProvider({ children, pageId, currentUserId }: Props) {
     }, [pageId]);
 
     const addThread = useCallback((text: string, author: string, authorId: string, id?: string): Thread => {
+        const threadId = id ?? newThreadId();
         const t: Thread = {
-            id: id ?? newThreadId(),
+            id: threadId,
             author, authorId, text, resolved: false, orphaned: false, replies: [],
             createdAt: formatDate(),
         };
         setThreads(prev => [...prev, t]);
 
-        if (pageId && getAccessToken() && currentUserId) {
+        if (pageId && getAccessToken()) {
             commentClient.makeComment({
-                userId: currentUserId,
                 pageId,
                 body:   text,
+                bodyId: threadId, // связываем с comment mark в редакторе
             }).catch(() => { /* silent */ });
         }
 
         return t;
-    }, [pageId, currentUserId]);
+    }, [pageId]);
 
     const addReply = useCallback((threadId: string, text: string, author: string, authorId: string) => {
         if (!text.trim()) return;
@@ -102,15 +106,17 @@ export function CommentsProvider({ children, pageId, currentUserId }: Props) {
             ? { ...t, replies: [...t.replies, { id: replyId, author, authorId, text: text.trim(), createdAt: formatDate() }] }
             : t));
 
-        if (pageId && getAccessToken() && currentUserId) {
+        // Находим id родительского комментария по threadId (bodyId).
+        // Если нет — отправляем как корневой с тем же bodyId.
+        if (pageId && getAccessToken()) {
             commentClient.makeComment({
-                userId:   currentUserId,
-                pageId:   pageId,
+                pageId,
                 body:     text.trim(),
-                parentId: threadId,
+                bodyId:   threadId,
+                parentId: threadId, // бэкенд разберёт по bodyId
             }).catch(() => { /* silent */ });
         }
-    }, [pageId, currentUserId]);
+    }, [pageId]);
 
     const getThread       = useCallback((id: string) => threads.find(t => t.id === id), [threads]);
     const resolveThread   = useCallback((id: string) =>

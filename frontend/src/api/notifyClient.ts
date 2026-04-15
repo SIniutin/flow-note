@@ -1,23 +1,35 @@
 // ─── src/api/notifyClient.ts ──────────────────────────────────────────────────
-// HTTP клиент для NotifyService (gRPC-gateway, /api/v1/notifications).
+// HTTP клиент для NotificationService (gRPC-gateway REST).
 // Swagger: api-contracts/docs/spec/proto/notify/v1/notify.swagger.json
 
-import { getAccessToken } from "../data/authStore";
+import { getAccessToken, handleUnauthorized } from "../data/authStore";
 
-// ── Types (camelCase — соответствует swagger v1Notification) ──────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type NotificationType =
+    | "NOTIFICATION_TYPE_UNSPECIFIED"
+    | "NOTIFICATION_TYPE_MENTION_COMMENT"
+    | "NOTIFICATION_TYPE_MENTION_PAGE"
+    | "NOTIFICATION_TYPE_COMMENT_THREAD"
+    | "NOTIFICATION_TYPE_COMMENT_REPLY"
+    | "NOTIFICATION_TYPE_COMMENT_MENTION"
+    | "NOTIFICATION_TYPE_GRAND_PERMISSION"
+    | "NOTIFICATION_TYPE_REVOKE_PERMISSION";
+
+export interface NotificationPayload {
+    entityId?: string;
+    pageId?:   string;
+}
 
 export interface Notification {
     id:           string;
     userId:       string;
-    type:         string;
+    type:         NotificationType;
     actorUserId?: string;
-    pageId?:      string;
-    threadId?:    string;
-    commentId?:   string;
-    payloadJson:  string;
-    read:         boolean;
+    payload?:     NotificationPayload;
     createdAt:    string;
     readAt?:      string;
+    cancelledAt?: string;
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -36,6 +48,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     if (!res.ok) {
+        if (res.status === 401) handleUnauthorized();
         const text = await res.text().catch(() => "");
         let message = text;
         try { message = JSON.parse(text).message ?? text; } catch { /* raw */ }
@@ -50,29 +63,36 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 // ── API ───────────────────────────────────────────────────────────────────────
 
 export const notifyClient = {
-    // GET /api/v1/notifications?unreadOnly=&onlyMentions=&limit=&offset=
-    listNotifications(opts: {
-        unreadOnly?:   boolean;
-        onlyMentions?: boolean;
-        limit?:        number;
-        offset?:       number;
-    } = {}): Promise<{ items: Notification[] }> {
+    // GET /v1/notify?pageSize=&unreadOnly=
+    getNotifications(opts: { pageSize?: number; unreadOnly?: boolean } = {}):
+        Promise<{ notifications: Notification[] }> {
         const params = new URLSearchParams();
-        if (opts.unreadOnly   !== undefined) params.set("unreadOnly",   String(opts.unreadOnly));
-        if (opts.onlyMentions !== undefined) params.set("onlyMentions", String(opts.onlyMentions));
-        if (opts.limit        !== undefined) params.set("limit",        String(opts.limit));
-        if (opts.offset       !== undefined) params.set("offset",       String(opts.offset));
+        if (opts.pageSize  !== undefined) params.set("pageSize",   String(opts.pageSize));
+        if (opts.unreadOnly !== undefined) params.set("unreadOnly", String(opts.unreadOnly));
         const qs = params.toString() ? `?${params}` : "";
-        return request("GET", `/api/v1/notifications${qs}`);
+        return request("GET", `/v1/notify${qs}`);
     },
 
-    // POST /api/v1/notifications/{notificationId}:mark-read
+    // POST /v1/notifications/{notificationId}/read
     markRead(notificationId: string): Promise<void> {
-        return request("POST", `/api/v1/notifications/${encodeURIComponent(notificationId)}:mark-read`, {});
+        return request("POST", `/v1/notifications/${encodeURIComponent(notificationId)}/read`, {});
     },
 
-    // POST /api/v1/notifications:mark-all-read
+    // POST /v1/notifications:readAll
     markAllRead(): Promise<void> {
-        return request("POST", `/api/v1/notifications:mark-all-read`, {});
+        return request("POST", "/v1/notifications:readAll", {});
     },
+};
+
+// ── Human-readable labels ──────────────────────────────────────────────────────
+
+export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
+    NOTIFICATION_TYPE_UNSPECIFIED:      "Уведомление",
+    NOTIFICATION_TYPE_MENTION_COMMENT:  "Упоминание в комментарии",
+    NOTIFICATION_TYPE_MENTION_PAGE:     "Упоминание на странице",
+    NOTIFICATION_TYPE_COMMENT_THREAD:   "Новый комментарий",
+    NOTIFICATION_TYPE_COMMENT_REPLY:    "Ответ на комментарий",
+    NOTIFICATION_TYPE_COMMENT_MENTION:  "Упоминание в комментарии",
+    NOTIFICATION_TYPE_GRAND_PERMISSION: "Вам открыт доступ",
+    NOTIFICATION_TYPE_REVOKE_PERMISSION:"Доступ отозван",
 };
