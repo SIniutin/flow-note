@@ -48,13 +48,14 @@ export default function App() {
 
     // ── Страница ──────────────────────────────────────────────────────────────
     const currentPage = useCurrentPage();
-    const pageId = currentPage?.id ?? "page-default";
+    const pageId = currentPage?.id ?? "";
 
     // Синхронно (до useEditorInstance) переключаем collab-провайдер при смене страницы.
     // useEffect здесь не подходит — он запускается ПОСЛЕ render, а useEditorInstance
     // читает ydoc/awareness уже во время render.
+    // Пропускаем, если страниц ещё нет (pageId пустой).
     const prevPageIdRef = useRef<string | null>(null);
-    if (prevPageIdRef.current !== pageId) {
+    if (pageId && prevPageIdRef.current !== pageId) {
         prevPageIdRef.current = pageId;
         collabProvider.connectCollab(pageId);
     }
@@ -67,12 +68,14 @@ export default function App() {
 
     // При смене страницы: загружаем пользователей с доступом (для @ mention).
     useEffect(() => {
+        if (!pageId) return;
         pageUsersStore.reset(pageId);
         void pageUsersStore.load(pageId);
     }, [pageId]);
 
     // После автообновления JWT-токена переподключаем page-провайдер без ремонта редактора.
     useEffect(() => {
+        if (!pageId) return;
         const handler = () => { collabProvider.reconnectPageProvider(pageId); };
         window.addEventListener("auth:token-refreshed", handler);
         return () => window.removeEventListener("auth:token-refreshed", handler);
@@ -92,9 +95,53 @@ export default function App() {
 
     const currentUser = useCurrentUser();
     const { user, logout: authLogout } = useAuth();
+
+    // ── Роль текущего пользователя для текущей страницы ───────────────────────
+    // null = ещё не определена (загрузка). «owner»/«editor»/«mentor» = можно редактировать.
+    const [myRole, setMyRole] = useState<string | null>(null);
+
+    useEffect(() => {
+        setMyRole(null); // сброс при смене страницы
+        if (!pageId || !user?.id) return;
+
+        // Владелец всегда может редактировать — проверяем синхронно.
+        if (currentPage?.ownerId === user.id) {
+            setMyRole("owner");
+            return;
+        }
+
+        let cancelled = false;
+        pageClient.listPermissions(pageId)
+            .then(({ permissions }) => {
+                if (cancelled) return;
+                const mine = permissions.find(p => p.userId === user.id);
+                setMyRole(mine ? mine.role : "viewer");
+            })
+            .catch(() => { if (!cancelled) setMyRole("viewer"); });
+
+        return () => { cancelled = true; };
+    }, [pageId, user?.id, currentPage?.ownerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /** Может ли текущий пользователь редактировать содержимое. */
+    const canEdit = ((): boolean => {
+        if (!myRole) return true; // пока роль не загружена — не блокируем
+        // Приводим как короткий формат («editor»), так и proto-формат («PAGE_PERMISSION_ROLE_EDITOR»)
+        const r = myRole.startsWith("PAGE_PERMISSION_ROLE_")
+            ? myRole.slice("PAGE_PERMISSION_ROLE_".length).toLowerCase()
+            : myRole.toLowerCase();
+        return r === "owner" || r === "editor" || r === "mentor";
+    })();
+
     // key={pageId} заставляет TipTap пересоздаться при смене страницы
     // (подхватывает новый ydoc из connectCollab)
-    const editor = useEditorInstance(currentUser, pageId);
+    const editor = useEditorInstance(currentUser, pageId || undefined);
+
+    // Применяем editability к TipTap-редактору при изменении роли.
+    // editor объявлен выше — эффект идёт после декларации.
+    useEffect(() => {
+        if (!editor) return;
+        editor.setEditable(canEdit, false);
+    }, [editor, canEdit]); // eslint-disable-line react-hooks/exhaustive-deps
     const {
         threads, visibleThreads, activeThreadId, setActiveThreadId, setOrphanedIds, removeThread,
     } = useComments();
@@ -110,12 +157,13 @@ export default function App() {
 
     // При первом синке ydoc из S3-снапшота (и при изменениях от других клиентов)
     // пробрасываем актуальные метаданные в pagesStore → сайдбар показывает свежий title.
+    // Пропускаем, если нет активной страницы.
     useEffect(() => {
-        if (pageMeta.title !== null) pagesStore.updateTitle(pageId, pageMeta.title);
+        if (pageId && pageMeta.title !== null) pagesStore.updateTitle(pageId, pageMeta.title);
     }, [pageMeta.title, pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
-        if (pageMeta.description !== null) pagesStore.updateDescription(pageId, pageMeta.description);
+        if (pageId && pageMeta.description !== null) pagesStore.updateDescription(pageId, pageMeta.description);
     }, [pageMeta.description, pageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Клики по comment-маркам ───────────────────────────────────────────────
@@ -355,34 +403,38 @@ export default function App() {
 
                 {/* Editor area */}
                 <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
-                    <PageShell
-                        toolbar={toolbar}
-                        rightTabs={tabs}
-                        sidePanel={sidePanel}
-                        footer={<EditorFooter editor={editor} saveStatus={saveStatus}/>}
-                        title={liveTitle}
-                        description={liveDescription}
-                        icon={currentPage?.icon}
-                        onTitleChange={title => {
-                            if (!currentPage) return;
-                            setPageMeta("title", title);
-                            pagesStore.updateTitle(currentPage.id, title);
-                            // Сохраняем в page-service чтобы новые участники
-                            // видели актуальный заголовок до загрузки collab-документа.
-                            pageClient.update(currentPage.id, { title }).catch(() => {});
-                        }}
-                        onDescriptionChange={desc => {
-                            if (!currentPage) return;
-                            setPageMeta("description", desc);
-                            pagesStore.updateDescription(currentPage.id, desc);
-                            pageClient.update(currentPage.id, { description: desc }).catch(() => {});
-                        }}
-                    >
-                        {loading
-                            ? <PageSkeleton/>
-                            : <EditorContent key={pageId} editor={editor}/>
-                        }
-                    </PageShell>
+                    {!currentPage ? (
+                        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-tertiary)",fontSize:"var(--fs-sm)"}}>
+                            Нет страниц. Создайте первую страницу в боковой панели.
+                        </div>
+                    ) : (
+                        <PageShell
+                            toolbar={toolbar}
+                            rightTabs={tabs}
+                            sidePanel={sidePanel}
+                            footer={<EditorFooter editor={editor} saveStatus={saveStatus}/>}
+                            title={liveTitle}
+                            description={liveDescription}
+                            icon={currentPage.icon}
+                            onTitleChange={canEdit ? title => {
+                                setPageMeta("title", title);
+                                pagesStore.updateTitle(currentPage.id, title);
+                                // Сохраняем в page-service чтобы новые участники
+                                // видели актуальный заголовок до загрузки collab-документа.
+                                pageClient.update(currentPage.id, { title }).catch(() => {});
+                            } : undefined}
+                            onDescriptionChange={canEdit ? desc => {
+                                setPageMeta("description", desc);
+                                pagesStore.updateDescription(currentPage.id, desc);
+                                pageClient.update(currentPage.id, { description: desc }).catch(() => {});
+                            } : undefined}
+                        >
+                            {loading
+                                ? <PageSkeleton/>
+                                : <EditorContent key={pageId} editor={editor}/>
+                            }
+                        </PageShell>
+                    )}
                 </div>
             </div>
 

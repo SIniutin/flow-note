@@ -10,6 +10,7 @@ export interface WikiPage {
     title:       string;
     icon?:       string;
     description?: string;
+    ownerId?:    string;
     createdAt:   string;
     updatedAt:   string;
 }
@@ -66,6 +67,7 @@ export const pagesStore = {
                 id:          bp.id,
                 title:       bp.title,
                 description: bp.description,
+                ownerId:     bp.ownerId,
                 createdAt:   bp.createdAt,
                 updatedAt:   bp.updatedAt,
             }));
