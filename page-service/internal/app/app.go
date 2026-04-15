@@ -54,6 +54,11 @@ func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, erro
 			cr.RecoveryUnaryServerInterceptor(logger),
 			grpcauth.UnaryAuthInterceptor(verifier, map[string]struct{}{
 				// TODO: make from config
+				"pb.PagesService_UpdatePage_FullMethodName":          {},
+				"pb.PagesService_ReplacePageLinks_FullMethodName":    {},
+				"pb.PagesService_ReplacePageMentions_FullMethodName": {},
+				"pb.PagesService_ReplacePageTables_FullMethodName":   {},
+				"pb.PagesService_ReplacePageMedia_FullMethodName":    {},
 			}),
 		),
 	)
