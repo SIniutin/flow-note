@@ -290,10 +290,14 @@ services:
       JWT_PUBLIC_KEY_PEM: "/run/secrets/jwt_public_key"
       JWT_ISSUER: "flow-note-auth"
       JWT_AUDIENCE: "flow-note-api"
+      RABBIT_URL: "amqp://guest:guest@rabbitmq:5672/"
+      RABBIT_EXCHANGE: "flow.events"
     secrets:
       - jwt_public_key
     depends_on:
       postgres-pages:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   # ── Media Service ───────────────────────────────────────────────────────────

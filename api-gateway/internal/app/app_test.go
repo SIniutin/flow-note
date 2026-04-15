@@ -93,12 +93,12 @@ func (s *fakeCollabTableServer) GetTableView(ctx context.Context, req *collabpb.
 
 func (s *fakeCommentServer) MakeComment(ctx context.Context, req *commentpb.CreateCommentRequest) (*commentpb.CreateCommentResponce, error) {
 	return &commentpb.CreateCommentResponce{
-		Comment: &commentpb.Comment{
-			Id:     "comment-1",
-			UserId: req.GetUserId(),
-			PageId: req.GetPageId(),
-			Body:   req.GetBody(),
-		},
+			Comment: &commentpb.Comment{
+				Id:     "comment-1",
+				UserId: "11111111-1111-1111-1111-111111111111",
+				PageId: req.GetPageId(),
+				Body:   req.GetBody(),
+			},
 	}, nil
 }
 

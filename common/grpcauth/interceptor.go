@@ -24,7 +24,7 @@ func UnaryAuthInterceptor(v authsecurity.Verifier, whitelist map[string]struct{}
 		if IsWhitelisted(whitelist, info.FullMethod) {
 			return handler(ctx, req)
 		}
-		println(info.FullMethod)
+
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, status.Error(codes.Unauthenticated, "missing metadata")
@@ -44,6 +44,10 @@ func UnaryAuthInterceptor(v authsecurity.Verifier, whitelist map[string]struct{}
 		if err != nil {
 			return nil, status.Error(codes.Unauthenticated, "invalid token")
 		}
+		if overrideRole := first(md.Get("x-user-role")); overrideRole != "" {
+			role = overrideRole
+		}
+
 		ctx = authctx.WithAuthInfo(ctx, authctx.AuthInfo{
 			UserID: userID,
 			Role:   role,

@@ -46,6 +46,9 @@ func StreamAuthInterceptor(v authsecurity.Verifier, whitelist map[string]struct{
 		if err != nil {
 			return status.Error(codes.Unauthenticated, "invalid token")
 		}
+		if overrideRole := first(md.Get("x-user-role")); overrideRole != "" {
+			role = overrideRole
+		}
 
 		ctx = authctx.WithAuthInfo(ctx, authctx.AuthInfo{
 			UserID: userID,

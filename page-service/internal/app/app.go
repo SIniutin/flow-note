@@ -33,6 +33,7 @@ type App struct {
 	httpServer *http.Server
 	listener   net.Listener
 	dbPool     *pgxpool.Pool
+	rabbit     *broker.RabbitMQ
 }
 
 func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, error) {
@@ -67,9 +68,9 @@ func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, erro
 	repo := repository.NewRepository(dbPool)
 	rabbit, err := broker.NewRabbitMQ(cfg.Rabbit.Url, cfg.Rabbit.Exchange)
 	if err != nil {
+		dbPool.Close()
 		return nil, err
 	}
-	defer rabbit.Close()
 
 	uc := usecase.NewService(logger, rabbit, repo, repo, repo, repo, repo, repo, repo)
 
@@ -79,6 +80,7 @@ func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, erro
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", cfg.GRPC.Port))
 	if err != nil {
 		dbPool.Close()
+		_ = rabbit.Close()
 		return nil, err
 	}
 
@@ -101,6 +103,7 @@ func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, erro
 	)
 	if err != nil {
 		_ = lis.Close()
+		_ = rabbit.Close()
 		dbPool.Close()
 		return nil, err
 	}
@@ -115,6 +118,7 @@ func New(ctx context.Context, logger *zap.Logger, cfg config.Config) (*App, erro
 		httpServer: httpServer,
 		listener:   lis,
 		dbPool:     dbPool,
+		rabbit:     rabbit,
 	}, nil
 }
 
@@ -153,6 +157,9 @@ func (a *App) Shutdown(ctx context.Context) error {
 	}
 	if a.dbPool != nil {
 		a.dbPool.Close()
+	}
+	if a.rabbit != nil {
+		_ = a.rabbit.Close()
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package authctx
 
 import (
 	"context"
+	"strings"
 
 	"github.com/flow-note/common/perm"
 	"github.com/google/uuid"
@@ -69,35 +70,37 @@ func ParseUserRoleFromCtx(ctx context.Context) (perm.PermissionRole, error) {
 		return "", ErrMissingUserRoleInContext
 	}
 
-	ok = isValidPermissionRole(authInfo.Role)
-	println(ok, authInfo.Role)
+	role := normalizePermissionRole(authInfo.Role)
+	ok = isValidPermissionRole(role)
 	if !ok {
 		return "", ErrInvalidUserRoleInContext
 	}
 
-	return MapRoleFromProto(authInfo.Role), nil
+	return role, nil
 }
 
-func isValidPermissionRole(role string) bool {
+func isValidPermissionRole(role perm.PermissionRole) bool {
 	switch role {
-	case "PAGE_PERMISSION_ROLE_OWNER", "PAGE_PERMISSION_ROLE_EDITOR", "PAGE_PERMISSION_ROLE_VIEWER", "PAGE_PERMISSION_ROLE_MENTOR", "PAGE_PERMISSION_ROLE_COMMENTER":
+	case perm.RoleOwner, perm.RoleEditor, perm.RoleViewer, perm.RoleMentor, perm.RoleCommenter:
 		return true
 	default:
 		return false
 	}
 }
 
-var protoToDomainRole = map[string]perm.PermissionRole{
-	"PAGE_PERMISSION_ROLE_VIEWER":      perm.RoleViewer,
-	"PAGE_PERMISSION_ROLE_COMMENTER":   perm.RoleCommenter,
-	"PAGE_PERMISSION_ROLE_EDITOR":      perm.RoleEditor,
-	"PAGE_PERMISSION_ROLE_MENTOR":      perm.RoleMentor,
-	"PAGE_PERMISSION_ROLE_OWNER":       perm.RoleOwner,
-	"PAGE_PERMISSION_ROLE_UNSPECIFIED": perm.RoleUnspecified,
-}
-
-func MapRoleFromProto(role string) perm.PermissionRole {
-	domainRole, _ := protoToDomainRole[role]
-
-	return domainRole
+func normalizePermissionRole(raw string) perm.PermissionRole {
+	switch strings.TrimSpace(raw) {
+	case "PAGE_PERMISSION_ROLE_VIEWER":
+		return perm.RoleViewer
+	case "PAGE_PERMISSION_ROLE_COMMENTER":
+		return perm.RoleCommenter
+	case "PAGE_PERMISSION_ROLE_EDITOR":
+		return perm.RoleEditor
+	case "PAGE_PERMISSION_ROLE_MENTOR":
+		return perm.RoleMentor
+	case "PAGE_PERMISSION_ROLE_OWNER":
+		return perm.RoleOwner
+	default:
+		return perm.PermissionRole(strings.ToLower(strings.TrimSpace(raw)))
+	}
 }

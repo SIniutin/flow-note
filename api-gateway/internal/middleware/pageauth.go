@@ -1,8 +1,11 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -36,6 +39,11 @@ return #keys
 // matches /v1/pages/{uuid} and /v1/pages/{uuid}/anything
 var pageIDRe = regexp.MustCompile(
 	`^/v1/pages/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:/.*)?$`,
+)
+
+// matches page-scoped routes whose page id is not under /v1/pages.
+var pageScopedPathRe = regexp.MustCompile(
+	`^/v1/(?:media/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:/.*)?$|^/v1/media/(?:snapshots/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:/.*)?$`,
 )
 
 // matches the target user in /v1/pages/{uuid}/permissions/{user_uuid}
@@ -96,7 +104,7 @@ func (pc *PagePermCache) Close() {
 // Transient errors are logged and fail-open (page-service itself still enforces).
 func (pc *PagePermCache) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		pageID := extractPageUUID(r.URL.Path)
+		pageID := extractPageID(r)
 		if pageID == "" {
 			next.ServeHTTP(w, r)
 			return
@@ -128,7 +136,7 @@ func (pc *PagePermCache) Middleware(next http.Handler) http.Handler {
 
 		ctx := authctx.WithAuthInfo(r.Context(), authctx.AuthInfo{
 			UserID: userID,
-			Role:   role,
+			Role:   firstNonEmpty(role, authInfo.Role),
 		})
 
 		// Invalidate after permission-mutating requests finish
@@ -163,7 +171,6 @@ func (pc *PagePermCache) getPermission(ctx context.Context, pageID, userID, toke
 	}
 
 	role := resp.GetPermission().GetRole().String()
-	println(role, "huinya")
 	if err := pc.rdb.Set(ctx, key, role, permCacheTTL).Err(); err != nil {
 		pc.logger.Warn("redis SET failed", zap.Error(err))
 	}
@@ -187,12 +194,42 @@ func (pc *PagePermCache) invalidate(ctx context.Context, pageID, targetUserID st
 	}
 }
 
-func extractPageUUID(path string) string {
-	m := pageIDRe.FindStringSubmatch(path)
-	if len(m) < 2 {
+func extractPageID(r *http.Request) string {
+	if pageID := extractPageUUID(r.URL.Path); pageID != "" {
+		return pageID
+	}
+	if pageID := r.URL.Query().Get("page_id"); pageID != "" {
+		return pageID
+	}
+	if r.Body == nil || (r.Method != http.MethodPost && r.Method != http.MethodPatch && r.Method != http.MethodPut) {
 		return ""
 	}
-	return m[1]
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return ""
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+
+	var payload struct {
+		PageID string `json:"page_id"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return ""
+	}
+	return payload.PageID
+}
+
+func extractPageUUID(path string) string {
+	for _, re := range []*regexp.Regexp{pageIDRe, pageScopedPathRe} {
+		m := re.FindStringSubmatch(path)
+		for i := 1; i < len(m); i++ {
+			if m[i] != "" {
+				return m[i]
+			}
+		}
+	}
+	return ""
 }
 
 func extractPermTargetUser(path string) string {
@@ -206,4 +243,13 @@ func extractPermTargetUser(path string) string {
 func isPermMutation(r *http.Request) bool {
 	return strings.Contains(r.URL.Path, "/permissions") &&
 		(r.Method == http.MethodPost || r.Method == http.MethodDelete || r.Method == http.MethodPatch)
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/flow-note/api-gateway/internal/handlers"
 	"github.com/flow-note/api-gateway/internal/middleware"
 	p "github.com/flow-note/api-gateway/internal/policy"
+	"github.com/flow-note/common/authctx"
 	"github.com/flow-note/common/authsecurity"
 	"github.com/flow-note/common/httpauth"
 	cr "github.com/flow-note/common/runtime"
@@ -58,10 +59,19 @@ func (a *App) Run(ctx context.Context) error {
 
 	grpcgw := runtime.NewServeMux(
 		runtime.WithMetadata(func(ctx context.Context, r *http.Request) metadata.MD {
+			md := metadata.MD{}
+
 			if token := httpauth.ExtractAccessToken(r); token != "" {
-				return metadata.Pairs("authorization", "Bearer "+token)
+				md.Set("authorization", "Bearer "+token)
 			}
-			return nil
+			if authInfo, ok := authctx.AuthInfoFromContext(ctx); ok && authInfo.Role != "" {
+				md.Set("x-user-role", authInfo.Role)
+			}
+
+			if len(md) == 0 {
+				return nil
+			}
+			return md
 		}),
 	)
 
