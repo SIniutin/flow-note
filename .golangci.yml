@@ -1,0 +1,28 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - gofmt
+    - wrapcheck
+    - exhaustruct
+
+linters-settings:
+  exhaustruct:
+    include:
+      # Enforce full struct init only for domain models and config structs.
+      # Add patterns here as new packages are introduced.
+      - "github\\.com/flow-note/.*/internal/domain\\..+"
+      - "github\\.com/flow-note/.*/internal/app\\.Config"
+
+  wrapcheck:
+    ignorePackageGlobs:
+      # Standard library and generated code don't need wrapping.
+      - "google.golang.org/grpc/*"
+      - "google.golang.org/grpc/status"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

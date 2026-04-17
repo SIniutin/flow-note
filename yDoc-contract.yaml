@@ -1,10 +1,18 @@
 schema_name: wikilive_editor_contract
-schema_version: 1
+schema_version: 2
 
 description: >
   Canonical document node contract for the collaborative editor.
   This contract is shared by frontend editor extensions, collab/parser,
   and pages-service indexing logic.
+
+schema_evolution:
+  v1_to_v2:
+    - "embed_media: removed src, poster — media_id is now required and the only identity"
+    - "embed_media: removed embed kind — external embeds are not supported"
+    - "mention: id is now required"
+    - "media_inline node removed — use embed_media block instead"
+    - "added: task_list, task_item, callout block nodes"
 
 document_model:
   title:
@@ -23,6 +31,8 @@ rules:
   - "mention is a structured inline node, not plain text parsing"
   - "mws_table stores only metadata/reference, not table cell data"
   - "embed_media stores render metadata, not full binary payload"
+  - "embed_media.media_id is required — clients must resolve the URL via media-service, never store URLs in the document"
+  - "media_inline does not exist — all media is block-level via embed_media"
 
 node_types:
   root:
@@ -177,16 +187,14 @@ node_types:
         kind:
           type: string
           required: true
-          allowed: [image, video, audio, file, embed]
+          allowed: [image, video, audio, file]
           description: Media rendering kind.
         media_id:
           type: string
-          required: false
-          description: Internal media asset identifier.
-        src:
-          type: string
-          required: false
-          description: Direct media URL or source link.
+          required: true
+          description: >
+            Internal media asset identifier. Clients must resolve the download/
+            display URL via media-service at render time. Never store a URL here.
         mime_type:
           type: string
           required: false
@@ -198,15 +206,15 @@ node_types:
         alt:
           type: string
           required: false
-          description: Accessibility/fallback text, mainly for images/embeds.
+          description: Accessibility/fallback text for images.
         width:
           type: integer
           required: false
-          description: Preferred rendered width.
+          description: Preferred rendered width in pixels.
         height:
           type: integer
           required: false
-          description: Preferred rendered height.
+          description: Preferred rendered height in pixels.
         file_name:
           type: string
           required: false
@@ -215,14 +223,55 @@ node_types:
           type: integer
           required: false
           description: File size in bytes.
-        poster:
+      description: >
+        Standalone media block. Identity is media_id only — URL is resolved
+        at render time by the client via media-service.
+
+    task_list:
+      kind: block
+      group: block
+      content: "task_item+"
+      attrs:
+        block_id:
+          type: string
+          required: true
+          description: Stable identifier of the task list block.
+      description: List of checkbox task items.
+
+    task_item:
+      kind: block
+      group: block
+      content: "paragraph block*"
+      attrs:
+        block_id:
+          type: string
+          required: true
+          description: Stable identifier of the task item block.
+        checked:
+          type: boolean
+          required: true
+          description: Whether the task is completed.
+      description: Single checkbox item inside a task_list.
+
+    callout:
+      kind: block
+      group: block
+      content: "block+"
+      attrs:
+        block_id:
+          type: string
+          required: true
+          description: Stable identifier of the callout block.
+        kind:
+          type: string
+          required: true
+          allowed: [info, warning, danger, success, note]
+          description: Visual intent of the callout.
+        icon:
           type: string
           required: false
-          description: Thumbnail/poster URL for video or rich embed preview.
-      constraints:
-        at_least_one_of: [media_id, src]
-      description: >
-        Standalone media block. Stores only minimal identity and render metadata.
+          description: Optional emoji or icon code overriding the default for the kind.
+      description: Highlighted callout block with a visual intent label.
 
     table_of_contents:
       kind: block
@@ -243,8 +292,11 @@ node_types:
       attrs:
         id:
           type: string
-          required: false
-          description: Internal mentioned entity identifier.
+          required: true
+          description: >
+            Internal identifier of the mentioned entity (user/team/group).
+            Must be resolved before inserting the node — unresolved mentions
+            must not be committed to the document.
         label:
           type: string
           required: true
@@ -276,36 +328,6 @@ node_types:
           required: false
           description: Optional block anchor inside the target page.
       description: Internal wiki page reference.
-
-    media_inline:
-      kind: inline
-      group: inline
-      content: none
-      attrs:
-        kind:
-          type: string
-          required: true
-          allowed: [emoji, icon, sticker, inline_file]
-          description: Inline media rendering kind.
-        media_id:
-          type: string
-          required: false
-          description: Internal inline media asset identifier.
-        src:
-          type: string
-          required: false
-          description: Direct source URL for inline asset.
-        mime_type:
-          type: string
-          required: false
-          description: MIME type when applicable.
-        title:
-          type: string
-          required: false
-          description: Tooltip/fallback text.
-      constraints:
-        at_least_one_of: [media_id, src]
-      description: Small inline media element inside text flow.
 
   text:
     text:
@@ -367,7 +389,7 @@ parser_expectations:
     - "mentions must be extracted from mention nodes, not regex over text"
     - "page refs must be extracted from page_link nodes"
     - "table refs must be extracted from mws_table nodes"
-    - "media refs must be extracted from embed_media and optionally media_inline"
+    - "media refs must be extracted from embed_media nodes only"
     - "each extracted entity should be associated with source_block_id when applicable"
 
 storage_guidelines:
@@ -421,7 +443,6 @@ examples:
           block_id="b5"
           kind="image"
           media_id="m1"
-          src="https://cdn.example.com/mockup.png"
           mime_type="image/png"
           title="Mockup"
           alt="Architecture mockup"
@@ -429,14 +450,20 @@ examples:
           height="720"
         />
 
-        <paragraph block_id="b6">
-          small icon
-          <media_inline
-            kind="icon"
-            media_id="icon-42"
-            title="Info icon"
-          />
-        </paragraph>
+        <callout block_id="b6" kind="warning">
+          <paragraph block_id="b7">
+            Do not deploy on Fridays.
+          </paragraph>
+        </callout>
+
+        <task_list block_id="b8">
+          <task_item block_id="b9" checked="false">
+            <paragraph block_id="b10">Write tests</paragraph>
+          </task_item>
+          <task_item block_id="b11" checked="true">
+            <paragraph block_id="b12">Update contract</paragraph>
+          </task_item>
+        </task_list>
       </doc>
 
   parsed_dto:
@@ -447,7 +474,7 @@ examples:
           type: "heading"
           text: "Project Plan"
           attrs:
-            level: "1"
+            level: 1
         - block_id: "b2"
           type: "paragraph"
           text: "Hello @slava"
@@ -464,13 +491,19 @@ examples:
           attrs:
             kind: "image"
             media_id: "m1"
-            src: "https://cdn.example.com/mockup.png"
+        - block_id: "b6"
+          type: "callout"
+          attrs:
+            kind: "warning"
+        - block_id: "b8"
+          type: "task_list"
       page_refs:
         - source_block_id: "b3"
           target_page_id: "page-777"
           label: "Architecture"
       table_refs:
-        - "dst001"
+        - source_block_id: "b4"
+          dst_id: "dst001"
       mentions:
         - source_block_id: "b2"
           id: "u123"
@@ -480,10 +513,12 @@ examples:
         - source_block_id: "b5"
           media_id: "m1"
           kind: "image"
-          src: "https://cdn.example.com/mockup.png"
           mime_type: "image/png"
           title: "Mockup"
       plain_text: |
         Project Plan
         Hello @slava
         See Architecture
+        Do not deploy on Fridays.
+        Write tests
+        Update contract

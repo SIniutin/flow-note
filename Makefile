@@ -2,7 +2,9 @@ SECRETS_DIR := secrets
 PRIVATE_KEY  := $(SECRETS_DIR)/jwt_private_key.pem
 PUBLIC_KEY   := $(SECRETS_DIR)/jwt_public_key.pem
 
-.PHONY: up down restart logs keys frontend dev auth-clear node-deps db-reset
+GO_SERVICES := api-gateway auth comment media notify page
+
+.PHONY: up down restart logs keys frontend dev auth-clear node-deps db-reset lint
 
 ## Generate JWT keys if missing
 keys:
@@ -51,6 +53,13 @@ auth-clear:
 ## Drop all app tables and migration history in every Postgres database
 db-reset:
 	sh ./scripts/reset-databases.sh
+
+## Run golangci-lint across all Go services
+lint:
+	@for svc in $(GO_SERVICES); do \
+		echo "==> linting services/$$svc"; \
+		(cd services/$$svc && golangci-lint run ./... --config ../../.golangci.yml) || exit 1; \
+	done
 
 ## Install frontend deps
 frontend:
